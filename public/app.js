@@ -1105,7 +1105,7 @@ function HomePage() {
                   <Td style={{ color: C.gold, fontWeight: 700 }}>{gnr.gnrNumber}</Td>
                   <Td style={{ fontWeight: 600 }}>{f?.name || gnr.farmerId}</Td>
                   <Td style={{ color: C.textMuted }}>{gnr.date}</Td>
-                  <Td style={{ color: C.coffee }}>{gnr.totalKg.toLocaleString()} kg</Td>
+                  <Td style={{ color: C.coffee }}>{(+(gnr.totalKg||0)).toLocaleString()} kg</Td>
                   <Td style={{ fontWeight: 700, color: C.danger }}>{fmtRWF(gnr.totalPaid)}</Td>
                 </tr>;
     })}</tbody>
@@ -1668,7 +1668,7 @@ function CWSDetailPage({ cwsId, onBack }) {
                     <Td style={{ color: C.gold, fontWeight: 700 }}>{gnr.gnrNumber}</Td>
                     <Td style={{ fontWeight: 600 }}>{f?.name || gnr.farmerId}</Td>
                     <Td style={{ color: C.textMuted }}>{gnr.date}</Td>
-                    <Td style={{ color: C.coffee, fontWeight: 700 }}>{gnr.totalKg.toLocaleString()} kg</Td>
+                    <Td style={{ color: C.coffee, fontWeight: 700 }}>{(+(gnr.totalKg||0)).toLocaleString()} kg</Td>
                     <Td style={{ fontWeight: 700, color: C.danger }}>{fmtRWF(gnr.totalPaid)}</Td>
                     <Td><div style={{ display: "flex", gap: 6 }}>
                       <button onClick={() => {
@@ -1699,7 +1699,7 @@ function CWSDetailPage({ cwsId, onBack }) {
                     <Td style={{ color: C.gold, fontWeight: 700 }}>{gnr.gnrNumber}</Td>
                     <Td style={{ fontWeight: 600 }}>{f?.name || gnr.farmerId}</Td>
                     <Td style={{ color: C.textMuted }}>{gnr.date}</Td>
-                    <Td style={{ color: C.coffee, fontWeight: 700 }}>{gnr.totalKg.toLocaleString()} kg</Td>
+                    <Td style={{ color: C.coffee, fontWeight: 700 }}>{(+(gnr.totalKg||0)).toLocaleString()} kg</Td>
                     <Td style={{ fontWeight: 700, color: C.danger }}>{fmtRWF(gnr.totalPaid)}</Td>
                     <Td style={{ color: C.textMuted, fontSize: 11 }}>{gnr.notes || "\u2014"}</Td>
                     <Td>{canPayGNR(u.role) && <button onClick={() => {
@@ -2026,7 +2026,7 @@ function CWSDetailPage({ cwsId, onBack }) {
             {gnr && <div style={{ padding: "12px 14px", background: C.surface, borderRadius: 9, border: `1px solid ${C.coffee}28`, marginBottom: 14 }}>
               <div style={{ fontWeight: 700, color: C.gold, marginBottom: 4, fontSize: 14 }}>{gnr.gnrNumber}</div>
               <div style={{ fontSize: 12, color: C.textMuted, marginBottom: 2 }}>Farmer: <b style={{ color: C.text }}>{farmer?.name || "\u2014"}</b> · {farmer?.farmerId}</div>
-              <div style={{ fontSize: 12, color: C.textMuted, marginBottom: 2 }}>Cherry: <b>{gnr.standardKg.toLocaleString()} kg std</b> + <b>{gnr.flotantKg.toLocaleString()} kg flotant</b> = <b style={{ color: C.coffee }}>{gnr.totalKg.toLocaleString()} kg total</b></div>
+              <div style={{ fontSize: 12, color: C.textMuted, marginBottom: 2 }}>Cherry: <b>{(+(gnr.standardKg||0)).toLocaleString()} kg std</b> + <b>{(+(gnr.flotantKg||0)).toLocaleString()} kg flotant</b> = <b style={{ color: C.coffee }}>{(+(gnr.totalKg||0)).toLocaleString()} kg total</b></div>
               <div style={{ fontSize: 14, fontWeight: 700, color: C.danger, marginTop: 6 }}>Total to Pay: {fmtRWF(gnr.totalPaid)}</div>
             </div>}
             <div style={{ display: "grid", gap: 12 }}>
@@ -2306,7 +2306,7 @@ function ReportsPage() {
         ...fCherry.map((c) => {
           const cws = cwsList.find((x) => x.id === c.cwsId);
           const f = farmers2.find((x) => x.id === c.farmerId);
-          return [c.date, c.gnrNumber, cws?.name || c.cwsId, f?.farmerId || c.farmerId, c.standardKg, c.flotantKg, c.totalKg, c.rateStandard, c.rateFlotant, c.paymentStandard, c.paymentFlotant, c.totalPaid, c.avgRate, c.paymentMethod, c.status];
+          return [c.date, c.gnrNumber, cws?.name || c.cwsId, f?.farmerId || c.farmerId, c.standardKg, c.flotantKg, c.totalKg, c.rateStandard, c.rateFlotant, c.paymentStandard, c.paymentFlotant, c.totalPaid, (c.avgRate||0), c.paymentMethod, c.status];
         })
       ];
       filename = "cherry_purchases";
@@ -2464,7 +2464,7 @@ function ReportsPage() {
             <SC label="GNR Records" value={fCherry.length} color={C.coffee} />
             <SC label="Standard kg" value={fmtKg(fCherry.reduce((s, c) => s + c.standardKg, 0))} color={C.coffeeLight} />
             <SC label="Flotant kg" value={fmtKg(fCherry.reduce((s, c) => s + c.flotantKg, 0))} color={C.warning} />
-            <SC label="Avg Rate" value={`${fCherry.length > 0 ? (fCherry.reduce((s, c) => s + c.avgRate, 0) / fCherry.length).toFixed(1) : 0} RWF/kg`} color={C.info} />
+            <SC label="Avg Rate" value={`${fCherry.length > 0 ? (fCherry.reduce((s, c) => s + (c.avgRate||0), 0) / fCherry.length).toFixed(1) : 0} RWF/kg`} color={C.info} />
           </div>
           <div style={{ background: C.bgCard, border: `1px solid ${C.border}`, borderRadius: 12, overflow: "hidden" }}>
             <div style={{ padding: "11px 16px", borderBottom: `1px solid ${C.border}`, fontWeight: 700, fontSize: 13, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -2969,11 +2969,11 @@ function GNRTable({ rows, cwsList, farmers: farmers2, full, showStation }) {
         <Td style={{ color: C.gold, fontWeight: 700, whiteSpace: "nowrap" }}>{c.gnrNumber}</Td>
         {showStation && <Td style={{ color: C.coffeeLight, fontSize: 11 }}>{cws?.name || c.cwsId}</Td>}
         <Td style={{ fontWeight: 500, whiteSpace: "nowrap" }}>{f?.name || c.farmerId}</Td>
-        {full && <><Td style={{ color: C.coffeeLight }}>{c.standardKg.toLocaleString()}</Td><Td style={{ color: C.warning }}>{c.flotantKg.toLocaleString()}</Td></>}
-        <Td style={{ fontWeight: 700, color: C.coffee }}>{c.totalKg.toLocaleString()} kg</Td>
+        {full && <><Td style={{ color: C.coffeeLight }}>{(+(c.standardKg||0)).toLocaleString()}</Td><Td style={{ color: C.warning }}>{(+(c.flotantKg||0)).toLocaleString()}</Td></>}
+        <Td style={{ fontWeight: 700, color: C.coffee }}>{(+(c.totalKg||0)).toLocaleString()} kg</Td>
         {full && <><Td style={{ color: C.textMuted }}>{c.rateStandard} RWF</Td><Td style={{ color: C.textMuted }}>{c.rateFlotant} RWF</Td></>}
         <Td style={{ fontWeight: 700, color: C.danger }}>{fmtRWF(c.totalPaid)}</Td>
-        {full && <Td style={{ color: C.info }}>{c.avgRate} RWF/kg</Td>}
+        {full && <Td style={{ color: C.info }}>{(c.avgRate||0)} RWF/kg</Td>}
         <Td>{c.paymentMethod ? <span style={{ padding: "2px 7px", borderRadius: 4, fontSize: 10, fontWeight: 700, background: `${C.info}18`, color: C.info }}>{c.paymentMethod.replace(/_/g, " ")}</span> : <span style={{ fontSize: 10, color: C.textDim, fontStyle: "italic" }}>Pending cashier</span>}</Td>
         <Td><SB status={c.status} /></Td>
       </tr>;
