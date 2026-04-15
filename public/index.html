@@ -46,7 +46,7 @@
   <!-- React + Recharts from CDN (cached by SW after first load) -->
   <script src="https://unpkg.com/react@18.3.1/umd/react.production.min.js" crossorigin></script>
   <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js" crossorigin></script>
-  <script src="https://unpkg.com/recharts@2.12.7/umd/Recharts.js" crossorigin></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/recharts/2.10.4/Recharts.js" crossorigin></script>
 
   <!-- Babel Standalone — transforms JSX to JS in the browser -->
   <script src="https://unpkg.com/@babel/standalone@7.23.6/babel.min.js" crossorigin></script>
@@ -58,8 +58,8 @@
   // ── Supabase client (anon key — safe in browser, RLS enforced) ──────
   // These values are injected at deploy time. In development, set them here.
   // In production, use your server's template rendering or a build step.
-  window.__SUPABASE_URL  = window.__SUPABASE_URL  || "REPLACE_WITH_YOUR_SUPABASE_URL";
-  window.__SUPABASE_ANON = window.__SUPABASE_ANON || "REPLACE_WITH_YOUR_SUPABASE_ANON_KEY";
+  window.__SUPABASE_URL  = window.__SUPABASE_URL  || "https://pcxsoxgwtwmdczcnxjuj.supabase.co";
+  window.__SUPABASE_ANON = window.__SUPABASE_ANON || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBjeHNveGd3dHdtZGN6Y254anVqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUwMjc0MTIsImV4cCI6MjA5MDYwMzQxMn0.ISFxkW6FLlWnDCpnAS_TTs_KOX6rFNZjliJ7g9Y-LCg";
 
   if (window.__SUPABASE_URL !== "REPLACE_WITH_YOUR_SUPABASE_URL") {
     window.__supabase = supabase.createClient(window.__SUPABASE_URL, window.__SUPABASE_ANON);
@@ -121,34 +121,25 @@
   <!-- Expose React hooks + Recharts globally for app.js -->
   <script>
   const { useState, useRef, useEffect, createContext, useContext } = React;
-  const { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid,
-          Tooltip, ResponsiveContainer, Legend, PieChart, Pie, Cell } = Recharts;
+  // Safe Recharts destructure — if CDN fails, stubs prevent a total crash
+  const _RC = (typeof Recharts !== "undefined") ? Recharts : {};
+  const _stub = ({ children }) => children || null;
+  const BarChart         = _RC.BarChart         || _stub;
+  const Bar              = _RC.Bar              || _stub;
+  const LineChart        = _RC.LineChart        || _stub;
+  const Line             = _RC.Line             || _stub;
+  const XAxis            = _RC.XAxis            || _stub;
+  const YAxis            = _RC.YAxis            || _stub;
+  const CartesianGrid    = _RC.CartesianGrid    || _stub;
+  const Tooltip          = _RC.Tooltip          || _stub;
+  const ResponsiveContainer = _RC.ResponsiveContainer || (({ children, ...p }) => React.createElement("div", { style: { width: "100%", height: p.height || 200 } }, children));
+  const Legend           = _RC.Legend           || _stub;
+  const PieChart         = _RC.PieChart         || _stub;
+  const Pie              = _RC.Pie              || _stub;
+  const Cell             = _RC.Cell             || _stub;
   </script>
 
   <script type="text/babel" src="/app.js" data-presets="react"></script>
 
-  <script>
-  // Babel compiles text/babel scripts async — wait for it then mount
-  function mountApp() {
-    try {
-      ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(App));
-    } catch(e) {
-      document.getElementById('root').innerHTML =
-        '<div style="padding:40px;color:#ff6666;font-family:monospace;background:#080E0A;min-height:100vh">' +
-        '<h2 style="margin-bottom:16px">Startup Error</h2><pre>' + e.stack + '</pre></div>';
-    }
-    const splash = document.getElementById('splash');
-    setTimeout(() => { splash.classList.add('hide'); setTimeout(() => splash.remove(), 400); }, 800);
-  }
-  // Babel fires a custom event when done; fall back to DOMContentLoaded
-  document.addEventListener('DOMContentLoaded', () => {
-    if (typeof Babel !== 'undefined') {
-      // Give Babel a tick to finish transforming then mount
-      setTimeout(mountApp, 100);
-    } else {
-      setTimeout(mountApp, 50);
-    }
-  });
-  </script>
+  <!-- app.js mounts itself at the bottom after Babel compiles it -->
 </body>
-</html>

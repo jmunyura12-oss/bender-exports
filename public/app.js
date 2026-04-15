@@ -366,6 +366,8 @@ function App() {
   const [leaves, setLeavesRaw] = useState(INIT_LEAVES);
   const [pending, setPendingRaw] = useState(INIT_PENDING);
   const [system, setSystemRaw] = useState(INIT_SYSTEM);
+  // Ensure system always has labels (merge incoming data with defaults)
+  const safeSystem = { ...INIT_SYSTEM, ...system, labels: { ...INIT_SYSTEM.labels, ...((system||{}).labels||{}) } };
   const [currentUser, setCurrentUser] = useState(null);
   const [online, setOnline] = useState(true);
   const [notifications, setNotifications] = useState([
@@ -413,7 +415,7 @@ function App() {
         const seeded = await DB.isSeeded();
         if (seeded) {
           const d = await DB.loadAll();
-          if (d.users) setUsersRaw(d.users);
+          if (d.users) setUsersRaw(d.users.map(u => ({ ...u, cwsAccess: u.cwsAccess || [] })));
           if (d.cws) setCwsListRaw(d.cws);
           if (d.farmers) setFarmersRaw(d.farmers);
           if (d.seasons) setSeasonsRaw(d.seasons);
@@ -942,7 +944,8 @@ function LoginPage({ onLogin, system }) {
     </div>;
 }
 function Shell({ onLogout }) {
-  const { currentUser: u, page, setPage, notifications, online, setOnline, fundRequests, system } = useApp();
+  const { currentUser: u, page, setPage, notifications, online, setOnline, fundRequests, system: _system } = useApp();
+  const system = { ...INIT_SYSTEM, ..._system, labels: { ...INIT_SYSTEM.labels, ...((_system||{}).labels||{}) } };
   // Safety guard — if user object is incomplete (missing name/role), show error instead of white screen
   if (!u || !u.name || !u.role) {
     return <div style={{ minHeight: "100vh", background: C.bg, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 16, padding: 24 }}>
@@ -958,9 +961,9 @@ function Shell({ onLogout }) {
   const pendingFunds = fundRequests.filter((f) => f.status === "pending_verification" || f.status === "pending_approval").length;
   const NAV = [
     { id: "home", label: "Dashboard", icon: "\u25C8", show: true },
-    { id: "coffee", label: system.labels.coffee || "Bender Coffee", icon: "\u2615", show: hasAccess(u, "coffee") },
-    { id: "machinery", label: system.labels.machinery || "Bender Machine", icon: "\u{1F3D7}\uFE0F", show: hasAccess(u, "machinery") },
-    { id: "construction", label: system.labels.construction || "Bender Construction", icon: "\u{1F3DB}\uFE0F", show: hasAccess(u, "construction") && !STATION_ROLES.concat("driver").includes(u.role) },
+    { id: "coffee", label: (system.labels||{}).coffee || "Bender Coffee", icon: "\u2615", show: hasAccess(u, "coffee") },
+    { id: "machinery", label: (system.labels||{}).machinery || "Bender Machine", icon: "\u{1F3D7}\uFE0F", show: hasAccess(u, "machinery") },
+    { id: "construction", label: (system.labels||{}).construction || "Bender Construction", icon: "\u{1F3DB}\uFE0F", show: hasAccess(u, "construction") && !STATION_ROLES.concat("driver").includes(u.role) },
     { id: "warehouse", label: "Warehouse", icon: "\u{1F3ED}", show: hasAccess(u, "warehouse") && !["clerk", "cashier", "driver"].includes(u.role) },
     { id: "reports", label: "Reports", icon: "\u{1F4CA}", show: hasAccess(u, "reports") },
     { id: "users", label: "Users", icon: "\u{1F465}", show: hasAccess(u, "users") },
@@ -1188,7 +1191,7 @@ function HomePage() {
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(130px,1fr))", gap: 14, marginBottom: 18 }}>
         <BizCard
     id="coffee"
-    label={system.labels.coffee || "Bender Coffee"}
+    label={((system||{}).labels||{}).coffee || "Bender Coffee"}
     icon="☕"
     color={C.coffee}
     colorLight={C.coffeeLight}
@@ -1197,7 +1200,7 @@ function HomePage() {
   />
         <BizCard
     id="machinery"
-    label={system.labels.machinery || "Bender Machine"}
+    label={((system||{}).labels||{}).machinery || "Bender Machine"}
     icon="🏗️"
     color={C.machinery}
     colorLight={C.machineryLight}
@@ -1206,7 +1209,7 @@ function HomePage() {
   />
         <BizCard
     id="construction"
-    label={system.labels.construction || "Bender Construction"}
+    label={((system||{}).labels||{}).construction || "Bender Construction"}
     icon="🏛️"
     color={C.construction}
     colorLight={C.constructionLight}
@@ -1582,8 +1585,8 @@ function CWSDetailPage({ cwsId, onBack }) {
         </div>
         <div style={{ marginLeft: "auto", display: "flex", gap: 7, flexWrap: "wrap", justifyContent: "flex-end" }}>
           {canEnterCherry(u.role) && <button onClick={() => setShowCherryForm(true)} style={{ ...BtnS(C.coffee), fontSize: 11, padding: "6px 12px" }}>🍒 Cherry Entry</button>}
-          {canRequestFunds(u.role) && (u.cwsAccess?.includes(cwsId) || canSeeAllStations(u.role)) && <button onClick={() => setShowFundReqForm(true)} style={{ ...BtnS(C.gold, true), fontSize: 11, padding: "6px 12px" }}>💰 Request Funds</button>}
-          {canRegisterFarmer(u.role) && (u.cwsAccess?.includes(cwsId) || canSeeAllStations(u.role)) && <button onClick={() => setShowFarmerForm(true)} style={{ ...BtnS(C.info, true), fontSize: 11, padding: "6px 12px" }}>👨‍🌾 Register Farmer</button>}
+          {canRequestFunds(u.role) && ((u.cwsAccess||[])?.includes(cwsId) || canSeeAllStations(u.role)) && <button onClick={() => setShowFundReqForm(true)} style={{ ...BtnS(C.gold, true), fontSize: 11, padding: "6px 12px" }}>💰 Request Funds</button>}
+          {canRegisterFarmer(u.role) && ((u.cwsAccess||[])?.includes(cwsId) || canSeeAllStations(u.role)) && <button onClick={() => setShowFarmerForm(true)} style={{ ...BtnS(C.info, true), fontSize: 11, padding: "6px 12px" }}>👨‍🌾 Register Farmer</button>}
           {canManageCash(u.role) && <button onClick={() => setShowCashForm(true)} style={{ ...BtnS(C.info, true), fontSize: 11, padding: "6px 12px" }}>+ Cash Entry</button>}
           {canRecordExpense(u.role) && <button onClick={() => setShowExpForm(true)} style={{ ...BtnS(C.warning, true), fontSize: 11, padding: "6px 12px" }}>+ Expense</button>}
         </div>
@@ -3105,10 +3108,13 @@ function Td({ children, style }) {
   const root = document.getElementById('root');
   if (!root) return;
   ReactDOM.createRoot(root).render(React.createElement(App));
-  // Dismiss splash screen
+  // Dismiss splash screen (guard against double removal)
   const splash = document.getElementById('splash');
-  if (splash) setTimeout(() => {
-    splash.classList.add('hide');
-    setTimeout(() => splash.remove(), 400);
-  }, 800);
+  if (splash && !splash.__removing) {
+    splash.__removing = true;
+    setTimeout(() => {
+      splash.classList.add('hide');
+      setTimeout(() => { if (splash.parentNode) splash.parentNode.removeChild(splash); }, 400);
+    }, 800);
+  }
 })();
