@@ -224,6 +224,7 @@ const INIT_MILESTONES = [
 const INIT_CONTRACTORS = [
   { id: "con1", projectId: "p1", name: "Kigali Build Co.", role: "Main Contractor", phone: "+250788500001", contractValue: 8e6, status: "active" }
 ];
+const SEED_VERSION = "v2.1"; // bump this to force re-seed on all clients
 const INIT_USERS = [
   // HQ
   { id: "u1", name: "Jean Pierre Habimana", email: "sudo@bender.rw", password: "sudo123", role: "sudo", cwsAccess: [], machineId: null, avatar: "JP", createdAt: "2024-01-01", active: true },
@@ -399,11 +400,11 @@ const DB = {
     }));
   },
   async isSeeded() {
-    try { return localStorage.getItem("db:seeded") === "true"; }
+    try { return localStorage.getItem("db:seeded") === SEED_VERSION; }
     catch (e) { return false; }
   },
   async markSeeded() {
-    try { localStorage.setItem("db:seeded", "true"); } catch (e) {}
+    try { localStorage.setItem("db:seeded", SEED_VERSION); } catch (e) {}
   },
   async reset() {
     try {
@@ -486,7 +487,13 @@ function App() {
         const seeded = await DB.isSeeded();
         if (seeded) {
           const d = await DB.loadAll();
-          if (d.users) setUsersRaw(d.users);
+          if (d.users) {
+            const merged = d.users.map(u => {
+              const init = INIT_USERS.find(x => x.id === u.id || x.email === u.email);
+              return { ...u, cwsAccess: u.cwsAccess || [], password: u.password || (init ? init.password : "") };
+            });
+            setUsersRaw(merged);
+          }
           if (d.cws) setCwsListRaw(d.cws);
           if (d.farmers) setFarmersRaw(d.farmers);
           if (d.seasons) setSeasonsRaw(d.seasons);
@@ -519,6 +526,7 @@ function App() {
           if (d.system) setSystemRaw(d.system);
         } else {
           await DB.save("users", INIT_USERS);
+          setUsersRaw(INIT_USERS);
           await DB.save("cws", INIT_CWS);
           await DB.save("farmers", INIT_FARMERS);
           await DB.save("seasons", INIT_SEASONS);
@@ -553,6 +561,14 @@ function App() {
   }, []);
   const addNote = (text, type = "info") => setNotifications((p) => [{ id: Date.now(), text, type, read: false, time: (/* @__PURE__ */ new Date()).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) }, ...p]);
   const login = async (email, password) => {
+    // Step 1: ALWAYS check INIT_USERS and loaded users first
+    // This guarantees demo/seed accounts always work, even before server responds
+    const localMatch =
+      INIT_USERS.find(x => x.email === email && x.password === password && x.active) ||
+      users.find(x => x.email === email && x.password === password && x.active);
+    if (localMatch) return localMatch;
+
+    // Step 2: Try Supabase via Express proxy (for real accounts created later)
     try {
       const res = await fetch("/api/auth/login", {
         method: "POST",
@@ -561,16 +577,50 @@ function App() {
       });
       const data = await res.json();
       if (!res.ok) return null;
+
       localStorage.setItem("bender_token", data.token);
-      // Dispatch to service worker so it can flush offline queue
       window.dispatchEvent(new CustomEvent("bender:token", { detail: data.token }));
-      // Find the matching user object from loaded users list
-      const u = users.find((x) => x.email === email && x.active);
-      return u || data.user || null;
-    } catch (e) {
-      // Fallback to local users if server unreachable (offline mode)
-      const u = users.find((x) => x.email === email && x.password === password && x.active);
+
+      // Try to get full profile with role/cwsAccess
+      let u = users.find(x => x.email === email && x.active);
+
+      if (!u) {
+        try {
+          const profRes = await fetch("/api/auth/me", {
+            headers: { "Authorization": `Bearer ${data.token}` }
+          });
+          if (profRes.ok) {
+            const prof = await profRes.json();
+            u = {
+              id:        prof.id,
+              name:      prof.name      || prof.full_name || email.split("@")[0],
+              email:     prof.email     || email,
+              role:      prof.role      || "clerk",
+              cwsAccess: prof.cwsAccess || prof.cws_access || [],
+              machineId: prof.machineId || prof.machine_id || null,
+              active:    prof.active    !== false,
+            };
+          }
+        } catch (_) {}
+      }
+
+      if (!u && data.user) {
+        const p = data.user;
+        u = {
+          id:        p.id,
+          name:      p.name      || p.full_name || email.split("@")[0],
+          email:     p.email     || email,
+          role:      p.role      || "clerk",
+          cwsAccess: p.cwsAccess || p.cws_access || [],
+          machineId: p.machineId || p.machine_id || null,
+          active:    true,
+        };
+      }
+
       return u || null;
+    } catch (e) {
+      // Complete offline fallback — already checked locals above
+      return null;
     }
   };
   const ctx = { users, setUsers, cwsList, setCwsList, farmers: farmers2, setFarmers, seasons, setSeasons, stationSeasons, setStationSeasons, cherry, setCherry, cashbook, setCashbook, bankTx, setBankTx, expenses, setExpenses, debts, setDebts, stock, setStock, fundRequests, setFundRequests, warehouseStock, setWarehouseStock, projects, setProjects, projectCosts, setProjectCosts, milestones, setMilestones, contractors, setContractors, machines, setMachines, assistants, setAssistants, tasks, setTasks, machTx, setMachTx, driverLogs, setDriverLogs, leaves, setLeaves, pending, setPending, system, setSystem, currentUser, online, setOnline, notifications, setNotifications, addNote, page, setPage, dbReady };
