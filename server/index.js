@@ -271,21 +271,40 @@ app.post("/api/users", auth, requireRoles("sudo","admin","md"), async (req, res)
 app.put("/api/users/:id", auth, async (req, res) => {
   if (req.user.id !== req.params.id && !["sudo","admin","md"].includes(req.user.role))
     return res.status(403).json({ error: "Forbidden" });
-  const { name, role, cwsAccess, machineId, avatar, active } = req.body || {};
+
+  const { name, role, cwsAccess, machineId, avatar, active, email } = req.body || {};
+  const paramId = req.params.id;
+
   try {
-    await sbFetch(`/profiles?id=eq.${req.params.id}`, {
-      method: "PATCH",
-      body: JSON.stringify({
-        ...(name       != null && { name }),
-        ...(role       != null && { role }),
-        ...(cwsAccess  != null && { cws_access: cwsAccess }),
-        ...(machineId  != null && { machine_id: machineId }),
-        ...(avatar     != null && { avatar }),
-        ...(active     != null && { active }),
-        updated_at: new Date().toISOString(),
-      }),
-    });
-    res.json({ ok: true });
+    const payload = {
+      ...(name       != null && { name }),
+      ...(role       != null && { role }),
+      ...(cwsAccess  != null && { cws_access: cwsAccess }),
+      ...(machineId  != null && { machine_id: machineId }),
+      ...(avatar     != null && { avatar }),
+      ...(active     != null && { active }),
+      updated_at: new Date().toISOString(),
+    };
+
+    // Try by UUID first (standard Supabase id)
+    const isUUID = /^[0-9a-f-]{36}$/i.test(paramId);
+    if (isUUID) {
+      await sbFetch(`/profiles?id=eq.${paramId}`, { method: "PATCH", body: JSON.stringify(payload) });
+      return res.json({ ok: true });
+    }
+
+    // Seed user — look up by email
+    if (email) {
+      const existing = await sbFetch(`/profiles?email=eq.${encodeURIComponent(email)}&select=id`);
+      if (existing && existing.length > 0) {
+        await sbFetch(`/profiles?id=eq.${existing[0].id}`, { method: "PATCH", body: JSON.stringify(payload) });
+        return res.json({ ok: true, supabaseId: existing[0].id });
+      }
+      // Profile doesn't exist yet — create it via signup flow
+      return res.status(404).json({ error: "Profile not found — use POST /api/seed-profiles first" });
+    }
+
+    res.status(400).json({ error: "Cannot identify user — provide UUID or email" });
   } catch (e) { res.status(400).json({ error: e.message }); }
 });
 
