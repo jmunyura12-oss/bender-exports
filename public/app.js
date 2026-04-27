@@ -1,52 +1,108 @@
 const C = {
-  bg: "#080E0A",
-  bgCard: "#0F1810",
-  surface: "#111A12",
-  border: "#1E2E1F",
-  borderLight: "#2A3E2B",
-  text: "#E8EDE8",
-  textMuted: "#6B8A6C",
-  textDim: "#3A5A3B",
-  gold: "#C8A84B",
+  // Base
+  bg:       "#0A0F0A",
+  bgCard:   "#111714",
+  bgDeep:   "#0D1210",
+  surface:  "#161E17",
+  surfaceHover: "#1C2720",
+  // Borders
+  border:      "#1F2E21",
+  borderLight: "#2A3E2C",
+  borderGlow:  "#C8A84B30",
+  // Text
+  text:      "#EDF2ED",
+  textMuted: "#7A9A7C",
+  textDim:   "#3E5C40",
+  // Brand gold
+  gold:      "#C8A84B",
   goldLight: "#E4C46A",
-  goldDim: "#7A6020",
-  coffee: "#B8733A",
-  coffeeLight: "#D89055",
-  coffeeBg: "#180E06",
-  machinery: "#3A7CA8",
-  machineryLight: "#5A9CC8",
-  machineryBg: "#060F18",
-  construction: "#8A5A28",
-  constructionLight: "#C8803E",
-  constructionBg: "#180E06",
-  danger: "#D44040",
-  dangerLight: "#E86060",
-  success: "#48B860",
-  warning: "#D89830",
-  warningLight: "#F0B848",
-  info: "#4888C8",
-  purple: "#8A4EC8",
-  purpleLight: "#AA6EE8"
+  goldDim:   "#7A6020",
+  goldGlow:  "#C8A84B20",
+  // Coffee / Cherry
+  coffee:    "#C4793C",
+  coffeeLight:"#E8965A",
+  coffeeBg:  "#1A0E06",
+  // Machinery
+  machinery:     "#4A8EC8",
+  machineryLight:"#6AAEE8",
+  machineryBg:   "#060F1A",
+  // Construction
+  construction:      "#9A6A30",
+  constructionLight: "#C8903E",
+  constructionBg:    "#1A1006",
+  // Semantic
+  danger:      "#E05050",
+  dangerLight: "#F07070",
+  dangerBg:    "#1A0808",
+  success:     "#4EC866",
+  successBg:   "#081A0C",
+  warning:     "#E0A030",
+  warningLight:"#F0C050",
+  warningBg:   "#1A1208",
+  info:        "#4A98E0",
+  infoBg:      "#080F1A",
+  purple:      "#9A5EE0",
+  purpleLight: "#BA80F8",
+  purpleBg:    "#100816",
+  // Gradients (used as strings)
+  gradSidebar: "linear-gradient(180deg,#0E1A0F 0%,#0A0F0A 100%)",
+  gradGold:    "linear-gradient(135deg,#C8A84B,#E4C46A)",
+  gradCard:    "linear-gradient(145deg,#141C15,#111714)",
 };
-const FONT = `@import url('https://fonts.googleapis.com/css2?family=Cormorant:wght@400;600;700&family=Syne:wght@300;400;500;600;700&display=swap');`;
+const FONT = `@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Cormorant:wght@400;600;700&display=swap');`;
 const GS = `${FONT}
 *{box-sizing:border-box;margin:0;padding:0;}
-body{font-family:'Syne',sans-serif;background:${C.bg};color:${C.text};overflow:auto;}
-::-webkit-scrollbar{width:4px;height:4px;}::-webkit-scrollbar-track{background:transparent;}::-webkit-scrollbar-thumb{background:${C.border};border-radius:10px;}
-@keyframes fadeUp{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
-@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
-@keyframes slideIn{from{transform:translateX(-100%)}to{transform:translateX(0)}}
-input,select,textarea,button{font-family:'Syne',sans-serif;}
+html{scroll-behavior:smooth;}
+body{font-family:'Inter',sans-serif;background:${C.bg};color:${C.text};overflow:auto;-webkit-font-smoothing:antialiased;}
+/* Scrollbar */
+::-webkit-scrollbar{width:4px;height:4px;}
+::-webkit-scrollbar-track{background:transparent;}
+::-webkit-scrollbar-thumb{background:${C.border};border-radius:10px;}
+::-webkit-scrollbar-thumb:hover{background:${C.borderLight};}
+/* Animations */
+@keyframes fadeUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+@keyframes shimmer{0%{background-position:-200% 0}100%{background-position:200% 0}}
+@keyframes slideIn{from{transform:translateX(-100%);opacity:0}to{transform:translateX(0);opacity:1}}
+@keyframes scaleIn{from{transform:scale(.95);opacity:0}to{transform:scale(1);opacity:1}}
+/* Typography */
+input,select,textarea,button{font-family:'Inter',sans-serif;}
+/* Layout helpers */
 .tbl-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;}
-.kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;}
-.two-col{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
-.three-col{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;}
-@media(max-width:600px){
+.kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px;}
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+.three-col{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px;}
+/* Card hover lift */
+.card-hover{transition:transform .2s ease,box-shadow .2s ease,border-color .2s ease;}
+.card-hover:hover{transform:translateY(-2px);box-shadow:0 8px 32px rgba(0,0,0,.4);}
+/* Nav item */
+.nav-item{transition:all .18s ease;border-radius:10px;cursor:pointer;}
+.nav-item:hover{background:${C.surfaceHover};}
+.nav-item.active{background:linear-gradient(135deg,${C.gold}22,${C.gold}0A);border:1px solid ${C.gold}30;}
+/* Button base */
+.btn{display:inline-flex;align-items:center;gap:6px;border:none;cursor:pointer;font-family:'Inter',sans-serif;font-weight:600;border-radius:8px;transition:all .18s ease;}
+.btn:hover{filter:brightness(1.1);transform:translateY(-1px);}
+.btn:active{transform:translateY(0);}
+/* Table row */
+.tbl-row{transition:background .12s;}
+.tbl-row:hover{background:${C.surfaceHover}!important;}
+/* Input focus */
+.inp:focus{border-color:${C.gold}!important;box-shadow:0 0 0 3px ${C.gold}15;}
+/* Badge */
+.badge{display:inline-flex;align-items:center;padding:3px 9px;border-radius:20px;font-size:10px;font-weight:700;letter-spacing:.3px;}
+/* Responsive */
+@media(max-width:768px){
   .two-col{grid-template-columns:1fr!important;}
   .hide-mobile{display:none!important;}
   .show-mobile{display:flex!important;}
+  .main-content{margin-left:0!important;}
   .page-pad{padding:14px!important;}
-  .topbar-title{font-size:15px!important;}
+  .topbar-title{font-size:16px!important;}
+  .kpi-grid{grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;}
+}
+@media(min-width:769px){
+  .show-mobile{display:none!important;}
 }`;
 const Ctx = createContext(null);
 const useApp = () => useContext(Ctx);
@@ -252,8 +308,25 @@ const canSeeAllStations = (r) => HQ_ROLES.includes(r) || ["admin"].includes(r);
 const fmtRWF = (n) => `${Number(n || 0).toLocaleString()} RWF`;
 const fmtKg = (n) => `${Number(n || 0).toLocaleString()} kg`;
 const today = () => (/* @__PURE__ */ new Date()).toISOString().split("T")[0];
-const BtnS = (color, ghost = false, outline = false) => ({ display: "inline-flex", alignItems: "center", gap: 5, border: outline ? `1px solid ${color}40` : "none", borderRadius: 7, cursor: "pointer", fontWeight: 600, fontFamily: "'Syne',sans-serif", transition: "all .15s", ...ghost ? { background: `${color}18`, color, border: `1px solid ${color}30` } : outline ? { background: "transparent", color } : { background: color, color: C.bg } });
-const selS = () => ({ width: "100%", padding: "9px 13px", background: C.bg, border: `1.5px solid ${C.border}`, borderRadius: 8, color: C.text, fontSize: 13, outline: "none" });
+const BtnS = (color, ghost = false, outline = false) => ({
+  display: "inline-flex", alignItems: "center", gap: 6,
+  border: "none", borderRadius: 10, cursor: "pointer",
+  fontWeight: 600, fontFamily: "'Inter',sans-serif",
+  fontSize: 13, transition: "all .18s ease",
+  ...(ghost
+    ? { background: `${color}15`, color, border: `1px solid ${color}28` }
+    : outline
+    ? { background: "transparent", color, border: `1px solid ${color}40` }
+    : { background: `linear-gradient(135deg,${color},${color}CC)`, color: "#0A0F0A", boxShadow: `0 4px 14px ${color}30` })
+});
+const selS = () => ({
+  width: "100%", padding: "10px 13px",
+  background: "linear-gradient(145deg,#0D1210,#111714)",
+  border: `1.5px solid ${C.border}`, borderRadius: 10,
+  color: C.text, fontSize: 13, outline: "none",
+  cursor: "pointer", transition: "border-color .15s",
+  appearance: "none", WebkitAppearance: "none",
+});
 // Global authenticated fetch — attaches Bearer token from localStorage automatically
 const apiFetch = async (path, opts = {}) => {
   const token = localStorage.getItem("bender_token");
@@ -366,8 +439,6 @@ function App() {
   const [leaves, setLeavesRaw] = useState(INIT_LEAVES);
   const [pending, setPendingRaw] = useState(INIT_PENDING);
   const [system, setSystemRaw] = useState(INIT_SYSTEM);
-  // Ensure system always has labels (merge incoming data with defaults)
-  const safeSystem = { ...INIT_SYSTEM, ...system, labels: { ...INIT_SYSTEM.labels, ...((system||{}).labels||{}) } };
   const [currentUser, setCurrentUser] = useState(null);
   const [online, setOnline] = useState(true);
   const [notifications, setNotifications] = useState([
@@ -415,12 +486,19 @@ function App() {
         const seeded = await DB.isSeeded();
         if (seeded) {
           const d = await DB.loadAll();
-          if (d.users) setUsersRaw(d.users.map(u => ({ ...u, cwsAccess: u.cwsAccess || [] })));
+          if (d.users) setUsersRaw(d.users);
           if (d.cws) setCwsListRaw(d.cws);
           if (d.farmers) setFarmersRaw(d.farmers);
           if (d.seasons) setSeasonsRaw(d.seasons);
           if (d.station_seasons) setStationSeasonsRaw(d.station_seasons);
-          if (d.cherry) setCherryRaw(d.cherry);
+          if (d.cherry) setCherryRaw(d.cherry.map(c => ({
+            ...c,
+            totalKg:   +(c.totalKg   || 0),
+            standardKg:+(c.standardKg|| 0),
+            flotantKg: +(c.flotantKg || 0),
+            totalPaid: +(c.totalPaid || 0),
+            avgRate:   +(c.avgRate   || 0),
+          })));
           if (d.cashbook) setCashbookRaw(d.cashbook);
           if (d.bank) setBankTxRaw(d.bank);
           if (d.expenses) setExpensesRaw(d.expenses);
@@ -475,13 +553,6 @@ function App() {
   }, []);
   const addNote = (text, type = "info") => setNotifications((p) => [{ id: Date.now(), text, type, read: false, time: (/* @__PURE__ */ new Date()).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) }, ...p]);
   const login = async (email, password) => {
-    // Step 1: always check local/seed users first (works offline + for demo accounts)
-    const localUser = users.find(
-      (x) => x.email === email && x.password === password && x.active
-    );
-    if (localUser) return localUser;
-
-    // Step 2: try Supabase via the Express proxy
     try {
       const res = await fetch("/api/auth/login", {
         method: "POST",
@@ -490,56 +561,21 @@ function App() {
       });
       const data = await res.json();
       if (!res.ok) return null;
-
       localStorage.setItem("bender_token", data.token);
+      // Dispatch to service worker so it can flush offline queue
       window.dispatchEvent(new CustomEvent("bender:token", { detail: data.token }));
-
-      // Try to find full profile (name, role, cwsAccess) from local store
-      let u = users.find((x) => x.email === email && x.active);
-
-      // Not in local store — fetch from /api/auth/me
-      if (!u) {
-        try {
-          const profRes = await fetch("/api/auth/me", {
-            headers: { "Authorization": `Bearer ${data.token}`, "Content-Type": "application/json" }
-          });
-          if (profRes.ok) {
-            const prof = await profRes.json();
-            u = {
-              id:        prof.id,
-              name:      prof.name      || prof.full_name || email.split("@")[0],
-              email:     prof.email     || email,
-              role:      prof.role      || "clerk",
-              cwsAccess: prof.cwsAccess || prof.cws_access || [],
-              machineId: prof.machineId || prof.machine_id || null,
-              active:    prof.active    !== false,
-            };
-          }
-        } catch (_) {}
-      }
-
-      // Last resort: normalise login response
-      if (!u && data.user) {
-        const p = data.user;
-        u = {
-          id:        p.id,
-          name:      p.name      || p.full_name || email.split("@")[0],
-          email:     p.email     || email,
-          role:      p.role      || "clerk",
-          cwsAccess: p.cwsAccess || p.cws_access || [],
-          machineId: p.machineId || p.machine_id || null,
-          active:    true,
-        };
-      }
-
-      return u || null;
+      // Find the matching user object from loaded users list
+      const u = users.find((x) => x.email === email && x.active);
+      return u || data.user || null;
     } catch (e) {
-      return null;
+      // Fallback to local users if server unreachable (offline mode)
+      const u = users.find((x) => x.email === email && x.password === password && x.active);
+      return u || null;
     }
   };
   const ctx = { users, setUsers, cwsList, setCwsList, farmers: farmers2, setFarmers, seasons, setSeasons, stationSeasons, setStationSeasons, cherry, setCherry, cashbook, setCashbook, bankTx, setBankTx, expenses, setExpenses, debts, setDebts, stock, setStock, fundRequests, setFundRequests, warehouseStock, setWarehouseStock, projects, setProjects, projectCosts, setProjectCosts, milestones, setMilestones, contractors, setContractors, machines, setMachines, assistants, setAssistants, tasks, setTasks, machTx, setMachTx, driverLogs, setDriverLogs, leaves, setLeaves, pending, setPending, system, setSystem, currentUser, online, setOnline, notifications, setNotifications, addNote, page, setPage, dbReady };
   if (!dbReady) return <div style={{ minHeight: "100vh", background: C.bg, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 16 }}>
-      <div style={{ fontFamily: "'Cormorant',serif", fontSize: 28, fontWeight: 700, color: C.gold }}>Bender Exports</div>
+      <div style={{ fontFamily: "'Inter',sans-serif", fontSize: 26, letterSpacing: '-0.5px', fontWeight: 700, color: C.gold }}>Bender Exports</div>
       <div style={{ fontSize: 13, color: C.textMuted }}>Loading database...</div>
       <div style={{ width: 180, height: 3, background: C.border, borderRadius: 4, overflow: "hidden" }}>
         <div style={{ height: "100%", background: C.gold, borderRadius: 4, animation: "pulse 1.2s ease infinite" }} />
@@ -907,7 +943,7 @@ function LoginPage({ onLogin, system }) {
         <div style={{ position: "absolute", inset: 0, background: "linear-gradient(135deg,rgba(8,14,10,.88) 0%,rgba(8,14,10,.35) 55%,rgba(8,14,10,.92) 100%)" }} />
         <div style={{ position: "absolute", height: "100%", width: "100%", display: "flex", flexDirection: "column", justifyContent: "space-between", padding: "40px 52px" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 14, position: "relative", zIndex: 1 }}>
-            <div style={{ width: 48, height: 48, borderRadius: 12, background: `${C.gold}22`, border: `1px solid ${C.gold}40`, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Cormorant',serif", fontSize: 22, fontWeight: 700, color: C.gold }}>BE</div>
+            <div style={{ width: 48, height: 48, borderRadius: 12, background: `${C.gold}22`, border: `1px solid ${C.gold}40`, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Inter',sans-serif", fontSize: 20, letterSpacing: '-0.3px', fontWeight: 700, color: C.gold }}>BE</div>
             <div><div style={{ fontFamily: "'Cormorant',serif", fontSize: 20, fontWeight: 700, color: C.text }}>{system.companyName}</div><div style={{ fontSize: 11, color: C.textMuted }}>Integrated Operations System</div></div>
           </div>
           <div style={{ position: "relative", zIndex: 1, animation: "fadeUp .8s ease both" }}>
@@ -923,8 +959,8 @@ function LoginPage({ onLogin, system }) {
         <div style={{ animation: "fadeUp .5s ease both" }}>
           {/* Mobile logo */}
           <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 28 }} className="show-mobile">
-            <div style={{ width: 40, height: 40, borderRadius: 10, background: `${C.gold}22`, border: `1px solid ${C.gold}40`, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Cormorant',serif", fontSize: 18, fontWeight: 700, color: C.gold }}>BE</div>
-            <div><div style={{ fontFamily: "'Cormorant',serif", fontSize: 18, fontWeight: 700, color: C.text }}>{system.companyName}</div><div style={{ fontSize: 10, color: C.textMuted }}>Integrated Operations System</div></div>
+            <div style={{ width: 40, height: 40, borderRadius: 10, background: `${C.gold}22`, border: `1px solid ${C.gold}40`, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Inter',sans-serif", fontSize: 17, letterSpacing: '-0.2px', fontWeight: 700, color: C.gold }}>BE</div>
+            <div><div style={{ fontFamily: "'Inter',sans-serif", fontSize: 17, letterSpacing: '-0.2px', fontWeight: 700, color: C.text }}>{system.companyName}</div><div style={{ fontSize: 10, color: C.textMuted }}>Integrated Operations System</div></div>
           </div>
           <div style={{ fontFamily: "'Cormorant',serif", fontSize: 30, fontWeight: 700, color: C.text, marginBottom: 4 }}>Welcome back</div>
           <p style={{ fontSize: 13, color: C.textMuted, marginBottom: 28 }}>Sign in to your account.</p>
@@ -944,108 +980,163 @@ function LoginPage({ onLogin, system }) {
     </div>;
 }
 function Shell({ onLogout }) {
-  const { currentUser: u, page, setPage, notifications, online, setOnline, fundRequests, system: _system } = useApp();
+  const { currentUser: u, page, setPage, notifications, online, fundRequests, system: _system } = useApp();
   const system = { ...INIT_SYSTEM, ..._system, labels: { ...INIT_SYSTEM.labels, ...((_system||{}).labels||{}) } };
-  // Safety guard — if user object is incomplete (missing name/role), show error instead of white screen
+
+  // Safety guard
   if (!u || !u.name || !u.role) {
     return <div style={{ minHeight: "100vh", background: C.bg, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 16, padding: 24 }}>
-      <div style={{ fontFamily: "'Cormorant',serif", fontSize: 22, fontWeight: 700, color: C.danger }}>Session Error</div>
-      <div style={{ fontSize: 13, color: C.textMuted, textAlign: "center", maxWidth: 320 }}>
-        Your user profile could not be loaded. This usually means your account exists in Supabase Auth but is missing a matching row in the <code style={{ color: C.gold }}>profiles</code> table. Please ask an admin or re-seed the database.
-      </div>
-      <button onClick={onLogout} style={{ ...BtnS(C.gold), padding: "9px 20px", fontSize: 13 }}>Sign out and try again</button>
+      <div style={{ fontSize: 22, fontWeight: 700, color: C.danger }}>Session Error</div>
+      <div style={{ fontSize: 13, color: C.textMuted, textAlign: "center", maxWidth: 320 }}>Your profile could not be loaded. Please sign out and try again.</div>
+      <button onClick={onLogout} style={{ ...BtnS(C.gold), padding: "9px 20px", fontSize: 13 }}>Sign out</button>
     </div>;
   }
+
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const unread = notifications.filter((n) => !n.read).length;
-  const pendingFunds = fundRequests.filter((f) => f.status === "pending_verification" || f.status === "pending_approval").length;
+  const [notifOpen, setNotifOpen] = useState(false);
+  const unread = notifications.filter(n => !n.read).length;
+  const pendingFunds = fundRequests.filter(f => f.status === "pending_verification" || f.status === "pending_approval").length;
+
   const NAV = [
-    { id: "home", label: "Dashboard", icon: "\u25C8", show: true },
-    { id: "coffee", label: (system.labels||{}).coffee || "Bender Coffee", icon: "\u2615", show: hasAccess(u, "coffee") },
-    { id: "machinery", label: (system.labels||{}).machinery || "Bender Machine", icon: "\u{1F3D7}\uFE0F", show: hasAccess(u, "machinery") },
-    { id: "construction", label: (system.labels||{}).construction || "Bender Construction", icon: "\u{1F3DB}\uFE0F", show: hasAccess(u, "construction") && !STATION_ROLES.concat("driver").includes(u.role) },
-    { id: "warehouse", label: "Warehouse", icon: "\u{1F3ED}", show: hasAccess(u, "warehouse") && !["clerk", "cashier", "driver"].includes(u.role) },
-    { id: "reports", label: "Reports", icon: "\u{1F4CA}", show: hasAccess(u, "reports") },
-    { id: "users", label: "Users", icon: "\u{1F465}", show: hasAccess(u, "users") },
-    { id: "system", label: "System", icon: "\u2699\uFE0F", show: hasAccess(u, "system") }
-  ].filter((n) => n.show);
+    { id: "home",         label: "Dashboard",                                          icon: "⊞" },
+    { id: "coffee",       label: (system.labels||{}).coffee       || "Bender Coffee",  icon: "☕", show: hasAccess(u, "coffee") },
+    { id: "machinery",    label: (system.labels||{}).machinery    || "Bender Machine", icon: "🏗️", show: hasAccess(u, "machinery") },
+    { id: "construction", label: (system.labels||{}).construction || "Construction",   icon: "🏛️", show: hasAccess(u, "construction") && !STATION_ROLES.concat("driver").includes(u.role) },
+    { id: "warehouse",    label: "Warehouse",                                          icon: "🏭", show: hasAccess(u, "warehouse") && !["clerk","cashier","driver"].includes(u.role) },
+    { id: "reports",      label: "Reports",                                            icon: "📊", show: hasAccess(u, "reports") },
+    { id: "users",        label: "Users",                                              icon: "👥", show: hasAccess(u, "users") },
+    { id: "system",       label: "System",                                             icon: "⚙️", show: hasAccess(u, "system") },
+  ].filter(n => n.show !== false);
+
   const closeSidebar = () => setSidebarOpen(false);
-  return <div style={{ display: "flex", minHeight: "100vh", overflow: "auto" }}>
-      {/* Mobile overlay */}
-      {sidebarOpen && <div onClick={closeSidebar} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.6)", zIndex: 998, display: "none" }} className="show-mobile" />}
-      <aside style={{ width: 224, background: C.bgCard, borderRight: `1px solid ${C.border}`, display: "flex", flexDirection: "column", flexShrink: 0, position: "fixed", top: 0, left: 0, height: "100vh", zIndex: 999, transform: sidebarOpen ? "translateX(0)" : "translateX(-100%)", transition: "transform .25s ease" }} className="show-mobile" />
-      <aside style={{ width: 224, background: C.bgCard, borderRight: `1px solid ${C.border}`, display: "flex", flexDirection: "column", flexShrink: 0 }} className="hide-mobile">
-        <div style={{ padding: "18px 16px 14px", borderBottom: `1px solid ${C.border}`, display: "flex", alignItems: "center", gap: 9 }}>
-          <div style={{ width: 32, height: 32, borderRadius: 7, background: `${C.gold}18`, border: `1px solid ${C.gold}30`, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Cormorant',serif", fontSize: 14, fontWeight: 700, color: C.gold, flexShrink: 0 }}>BE</div>
-          <div><div style={{ fontFamily: "'Cormorant',serif", fontSize: 13, fontWeight: 700, color: C.text, lineHeight: 1.1 }}>Bender <span style={{ color: C.gold }}>Exports</span></div><div style={{ fontSize: 9, color: C.textDim, letterSpacing: "1px", textTransform: "uppercase" }}>Management System</div></div>
+
+  const SidebarContent = ({ mobile }) => <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
+    {/* Logo */}
+    <div style={{ padding: "20px 18px 16px", borderBottom: `1px solid ${C.border}`, display: "flex", alignItems: "center", gap: 11 }}>
+      <img src="/icons/logo_gold.png" alt="BE" style={{ width: 36, height: 36, objectFit: "contain", flexShrink: 0 }} />
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 14, fontWeight: 700, color: C.text, letterSpacing: "-0.3px", lineHeight: 1.2 }}>Bender <span style={{ background: C.gradGold, WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>Exports</span></div>
+        <div style={{ fontSize: 9, color: C.textDim, letterSpacing: "1.2px", textTransform: "uppercase", marginTop: 1 }}>Management System</div>
+      </div>
+      {mobile && <div onClick={closeSidebar} style={{ cursor: "pointer", color: C.textMuted, fontSize: 18, padding: "2px 4px", lineHeight: 1 }}>✕</div>}
+    </div>
+
+    {/* Nav section label */}
+    <div style={{ padding: "14px 18px 6px" }}>
+      <div style={{ fontSize: 9, fontWeight: 700, color: C.textDim, textTransform: "uppercase", letterSpacing: "1.2px" }}>Main Menu</div>
+    </div>
+
+    {/* Nav items */}
+    <nav style={{ flex: 1, padding: "2px 10px", overflowY: "auto" }}>
+      {NAV.map(item => {
+        const active = page.view === item.id;
+        const hasBadge = item.id === "coffee" && pendingFunds > 0 && canVerifyFunds(u.role);
+        return <div key={item.id}
+          onClick={() => { setPage({ view: item.id, sub: null }); if (mobile) closeSidebar(); }}
+          style={{
+            display: "flex", alignItems: "center", gap: 10,
+            padding: "9px 12px", borderRadius: 11, cursor: "pointer", marginBottom: 2,
+            background: active ? `linear-gradient(135deg,${C.gold}20,${C.gold}08)` : "transparent",
+            color: active ? C.gold : C.textMuted,
+            fontWeight: active ? 600 : 400, fontSize: 13,
+            border: `1px solid ${active ? C.gold+"28" : "transparent"}`,
+            transition: "all .15s ease",
+          }}
+          onMouseEnter={e => { if (!active) { e.currentTarget.style.background = C.surfaceHover; e.currentTarget.style.color = C.text; } }}
+          onMouseLeave={e => { if (!active) { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = C.textMuted; } }}>
+          <span style={{ fontSize: 15, width: 20, textAlign: "center", flexShrink: 0 }}>{item.icon}</span>
+          <span style={{ flex: 1 }}>{item.label}</span>
+          {hasBadge && <span style={{ background: `linear-gradient(135deg,${C.warning},${C.warningLight})`, color: "#0A0F0A", fontSize: 9, padding: "2px 6px", borderRadius: 20, fontWeight: 700 }}>{pendingFunds}</span>}
+          {active && <span style={{ width: 4, height: 4, borderRadius: "50%", background: C.gold, flexShrink: 0 }} />}
+        </div>;
+      })}
+    </nav>
+
+    {/* Online status */}
+    <div style={{ padding: "8px 12px" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", borderRadius: 10, background: online ? `${C.success}0C` : `${C.danger}0C`, border: `1px solid ${online ? C.success : C.danger}20` }}>
+        <span style={{ width: 7, height: 7, borderRadius: "50%", background: online ? C.success : C.danger, animation: online ? "pulse 2s infinite" : "none", flexShrink: 0 }} />
+        <span style={{ fontSize: 11, fontWeight: 500, color: online ? C.success : C.danger }}>{online ? "Online · Synced" : "Offline mode"}</span>
+      </div>
+    </div>
+
+    {/* User footer */}
+    <div style={{ padding: "10px 14px 14px", borderTop: `1px solid ${C.border}` }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        <Ava user={u} size={34} />
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 12, fontWeight: 600, color: C.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{u.name.split(" ").slice(0, 2).join(" ")}</div>
+          <RB role={u.role} sm />
         </div>
-        <nav style={{ flex: 1, padding: "10px 8px", overflowY: "auto" }}>
-          {NAV.map((item) => {
-    const active = page.view === item.id;
-    return <div key={item.id} onClick={() => setPage({ view: item.id, sub: null })} style={{ display: "flex", alignItems: "center", gap: 9, padding: "8px 10px", borderRadius: 8, cursor: "pointer", marginBottom: 2, background: active ? `${C.gold}15` : "transparent", color: active ? C.gold : C.textMuted, fontWeight: active ? 700 : 400, fontSize: 13, transition: "all .15s" }} onMouseEnter={(e) => {
-      if (!active) e.currentTarget.style.background = `${C.border}80`;
-    }} onMouseLeave={(e) => {
-      if (!active) e.currentTarget.style.background = "transparent";
-    }}>
-              <span style={{ fontSize: 14, width: 18, textAlign: "center" }}>{item.icon}</span>
-              <span>{item.label}</span>
-              {item.id === "coffee" && pendingFunds > 0 && canVerifyFunds(u.role) && <span style={{ marginLeft: "auto", background: C.warning, color: C.bg, fontSize: 9, padding: "1px 5px", borderRadius: 8, fontWeight: 700 }}>{pendingFunds}</span>}
-            </div>;
-  })}
-        </nav>
-        <div style={{ padding: "7px 10px", borderTop: `1px solid ${C.border}` }}>
-          <div onClick={() => setOnline(!online)} style={{ display: "flex", alignItems: "center", gap: 7, padding: "7px 10px", borderRadius: 7, cursor: "pointer", background: online ? `${C.success}10` : `${C.danger}10`, color: online ? C.success : C.danger, fontSize: 11, fontWeight: 600 }}>
-            <span style={{ width: 6, height: 6, borderRadius: "50%", background: online ? C.success : C.danger, animation: online ? "pulse 2s infinite" : "none", flexShrink: 0 }} />
-            {online ? "Online \xB7 Synced" : "Offline mode"}
-          </div>
+        <button onClick={onLogout} title="Sign out" style={{ background: "transparent", border: `1px solid ${C.border}`, borderRadius: 8, cursor: "pointer", color: C.textMuted, fontSize: 14, padding: "5px 7px", lineHeight: 1, transition: "all .15s" }} onMouseEnter={e => { e.currentTarget.style.borderColor = C.danger; e.currentTarget.style.color = C.danger; }} onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.textMuted; }}>↩</button>
+      </div>
+    </div>
+  </div>;
+
+  return <div style={{ display: "flex", minHeight: "100vh" }}>
+    {/* Mobile overlay */}
+    {sidebarOpen && <div onClick={closeSidebar} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.65)", zIndex: 998, backdropFilter: "blur(4px)" }} className="show-mobile" />}
+
+    {/* Desktop sidebar */}
+    <aside style={{ width: 232, background: C.gradSidebar, borderRight: `1px solid ${C.border}`, display: "flex", flexDirection: "column", flexShrink: 0, position: "sticky", top: 0, height: "100vh", overflowY: "auto" }} className="hide-mobile">
+      <SidebarContent mobile={false} />
+    </aside>
+
+    {/* Mobile sidebar */}
+    <aside style={{ width: 248, background: C.gradSidebar, borderRight: `1px solid ${C.border}`, display: "flex", flexDirection: "column", position: "fixed", top: 0, left: 0, height: "100vh", zIndex: 999, transform: sidebarOpen ? "translateX(0)" : "translateX(-100%)", transition: "transform .25s cubic-bezier(.4,0,.2,1)", boxShadow: sidebarOpen ? "8px 0 32px rgba(0,0,0,.4)" : "none" }} className="show-mobile">
+      <SidebarContent mobile={true} />
+    </aside>
+
+    {/* Main content */}
+    <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0, background: C.bg }} className="main-content">
+
+      {/* Inline responsive CSS */}
+      <style>{`
+        .show-mobile{display:none}
+        .main-content{margin-left:0}
+        @media(max-width:768px){
+          .show-mobile{display:flex!important}
+          .hide-mobile{display:none!important}
+        }
+        table{border-collapse:collapse;width:100%;}
+        tr:hover td{background:${C.surfaceHover};}
+      `}</style>
+
+      {/* Top bar */}
+      <div style={{ height: 58, background: `${C.bgCard}E0`, backdropFilter: "blur(12px)", borderBottom: `1px solid ${C.border}`, display: "flex", alignItems: "center", padding: "0 20px", gap: 14, flexShrink: 0, position: "sticky", top: 0, zIndex: 100 }}>
+        {/* Hamburger */}
+        <button onClick={() => setSidebarOpen(true)} className="show-mobile" style={{ background: "transparent", border: `1px solid ${C.border}`, color: C.textMuted, fontSize: 16, cursor: "pointer", padding: "6px 9px", borderRadius: 9, lineHeight: 1, flexShrink: 0 }}>☰</button>
+
+        {/* Breadcrumb title */}
+        <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 8 }} className="topbar-title">
+          <span style={{ fontSize: 16, fontWeight: 700, color: C.text, letterSpacing: "-0.3px" }}>{NAV.find(n => n.id === page.view)?.label || "Dashboard"}</span>
+          {page.sub && <>
+            <span style={{ color: C.textDim, fontSize: 13 }}>›</span>
+            <span style={{ fontSize: 13, color: C.textMuted, fontWeight: 400 }}>{page.sub}</span>
+          </>}
         </div>
-        <div style={{ padding: "11px 13px", borderTop: `1px solid ${C.border}`, display: "flex", alignItems: "center", gap: 8 }}>
-          <Ava user={u} size={32} />
-          <div style={{ flex: 1, minWidth: 0 }}><div style={{ fontSize: 12, fontWeight: 600, color: C.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{u.name.split(" ").slice(0, 2).join(" ")}</div><RB role={u.role} sm /></div>
-          <div onClick={onLogout} style={{ cursor: "pointer", color: C.textDim, fontSize: 14, padding: 4 }} title="Sign out" onMouseEnter={(e) => e.target.style.color = C.danger} onMouseLeave={(e) => e.target.style.color = C.textDim}>↩</div>
+
+        {/* Notification bell */}
+        <div onClick={() => setNotifOpen(p => !p)} style={{ position: "relative", cursor: "pointer", width: 36, height: 36, borderRadius: 10, background: unread > 0 ? `${C.gold}12` : C.surface, border: `1px solid ${unread > 0 ? C.gold+"30" : C.border}`, display: "flex", alignItems: "center", justifyContent: "center", transition: "all .15s", flexShrink: 0 }}>
+          <span style={{ fontSize: 14 }}>🔔</span>
+          {unread > 0 && <span style={{ position: "absolute", top: -3, right: -3, minWidth: 16, height: 16, background: `linear-gradient(135deg,${C.danger},${C.dangerLight})`, borderRadius: 20, fontSize: 9, fontWeight: 700, color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", border: `2px solid ${C.bg}`, padding: "0 3px" }}>{unread}</span>}
         </div>
-      </aside>
-      {/* Mobile sidebar (rendered separately so it can be fixed/positioned) */}
-      <aside style={{ width: 224, background: C.bgCard, borderRight: `1px solid ${C.border}`, display: "flex", flexDirection: "column", position: "fixed", top: 0, left: 0, height: "100vh", zIndex: 999, transform: sidebarOpen ? "translateX(0)" : "translateX(-100%)", transition: "transform .25s ease" }} className="show-mobile">
-        <div style={{ padding: "18px 16px 14px", borderBottom: `1px solid ${C.border}`, display: "flex", alignItems: "center", gap: 9 }}>
-          <div style={{ width: 32, height: 32, borderRadius: 7, background: `${C.gold}18`, border: `1px solid ${C.gold}30`, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Cormorant',serif", fontSize: 14, fontWeight: 700, color: C.gold, flexShrink: 0 }}>BE</div>
-          <div style={{ flex: 1 }}><div style={{ fontFamily: "'Cormorant',serif", fontSize: 13, fontWeight: 700, color: C.text, lineHeight: 1.1 }}>Bender <span style={{ color: C.gold }}>Exports</span></div></div>
-          <div onClick={closeSidebar} style={{ cursor: "pointer", color: C.textMuted, fontSize: 18, padding: "0 4px" }}>✕</div>
-        </div>
-        <nav style={{ flex: 1, padding: "10px 8px", overflowY: "auto" }}>
-          {NAV.map((item) => {
-    const active = page.view === item.id;
-    return <div key={item.id} onClick={() => { setPage({ view: item.id, sub: null }); closeSidebar(); }} style={{ display: "flex", alignItems: "center", gap: 9, padding: "10px 12px", borderRadius: 8, cursor: "pointer", marginBottom: 3, background: active ? `${C.gold}15` : "transparent", color: active ? C.gold : C.textMuted, fontWeight: active ? 700 : 400, fontSize: 14, minHeight: 44 }}>
-              <span style={{ fontSize: 16, width: 20, textAlign: "center" }}>{item.icon}</span>
-              <span>{item.label}</span>
-              {item.id === "coffee" && pendingFunds > 0 && canVerifyFunds(u.role) && <span style={{ marginLeft: "auto", background: C.warning, color: C.bg, fontSize: 9, padding: "1px 5px", borderRadius: 8, fontWeight: 700 }}>{pendingFunds}</span>}
-            </div>;
-  })}
-        </nav>
-        <div style={{ padding: "11px 13px", borderTop: `1px solid ${C.border}`, display: "flex", alignItems: "center", gap: 8 }}>
-          <Ava user={u} size={32} />
-          <div style={{ flex: 1, minWidth: 0 }}><div style={{ fontSize: 12, fontWeight: 600, color: C.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{u.name.split(" ").slice(0, 2).join(" ")}</div><RB role={u.role} sm /></div>
-          <div onClick={onLogout} style={{ cursor: "pointer", color: C.textDim, fontSize: 14, padding: 4 }}>↩</div>
-        </div>
-      </aside>
-      <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "auto", marginLeft: 224 }} className="main-content">
-        <style>{`.show-mobile{display:none}.main-content{margin-left:224px}@media(max-width:600px){.show-mobile{display:flex!important}.hide-mobile{display:none!important}.main-content{margin-left:0!important}}`}</style>
-        <div style={{ height: 50, background: C.bgCard, borderBottom: `1px solid ${C.border}`, display: "flex", alignItems: "center", padding: "0 16px", gap: 12, flexShrink: 0 }}>
-          {/* Hamburger — mobile only */}
-          <button onClick={() => setSidebarOpen(true)} className="show-mobile" style={{ background: "transparent", border: "none", color: C.textMuted, fontSize: 20, cursor: "pointer", padding: "4px 6px", lineHeight: 1, minWidth: 44, minHeight: 44, display: "none", alignItems: "center", justifyContent: "center", borderRadius: 7 }}>☰</button>
-          <div style={{ flex: 1, fontFamily: "'Cormorant',serif", fontSize: 20, fontWeight: 700, color: C.text }} className="topbar-title">{NAV.find((n) => n.id === page.view)?.label || "Dashboard"}{page.sub && <span style={{ color: C.textMuted, fontSize: 13, fontWeight: 400, marginLeft: 8 }}>/ {page.sub}</span>}</div>
-          <div style={{ position: "relative", cursor: "pointer", padding: "5px 9px", borderRadius: 7, background: unread > 0 ? `${C.gold}10` : "transparent", border: `1px solid ${unread > 0 ? C.gold + "28" : C.border}`, minWidth: 36, minHeight: 36, display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <span style={{ fontSize: 13 }}>🔔</span>
-            {unread > 0 && <span style={{ position: "absolute", top: 2, right: 2, width: 7, height: 7, background: C.danger, borderRadius: "50%", border: `2px solid ${C.bgCard}` }} />}
-          </div>
-          <Ava user={u} size={28} />
-        </div>
-        <div style={{ flex: 1, overflowY: "auto", padding: "22px 26px", minHeight: 0 }} className="page-pad">
-          <PageRouter />
+
+        {/* User chip */}
+        <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "5px 10px 5px 5px", borderRadius: 20, background: C.surface, border: `1px solid ${C.border}`, cursor: "default" }}>
+          <Ava user={u} size={26} />
+          <span style={{ fontSize: 12, fontWeight: 500, color: C.text, whiteSpace: "nowrap", maxWidth: 100, overflow: "hidden", textOverflow: "ellipsis" }} className="hide-mobile">{u.name.split(" ")[0]}</span>
         </div>
       </div>
-    </div>;
+
+      {/* Page content */}
+      <div style={{ flex: 1, overflowY: "auto", padding: "24px 28px", minHeight: 0, animation: "fadeUp .25s ease both" }} className="page-pad">
+        <PageRouter />
+      </div>
+    </div>
+  </div>;
 }
+
 function PageRouter() {
   const { page, currentUser: u } = useApp();
   if (u.role === "driver") return <DriverHome />;
@@ -1053,20 +1144,20 @@ function PageRouter() {
   return <div style={{ animation: "fadeUp .3s ease both" }}>{views[page.view] || <HomePage />}</div>;
 }
 function HomePage() {
-  const { currentUser: u, cherry, expenses, cashbook, fundRequests, cwsList, machTx, users, system, setPage } = useApp();
+  const { currentUser: u, cherry, expenses, cashbook, fundRequests, cwsList, machTx, machines, tasks, users, system, setPage } = useApp();
   if (u.role === "clerk") {
     const myCws = cwsList.find((c) => (u.cwsAccess || []).includes(c.id));
     const myCherry = cherry.filter((c) => (u.cwsAccess || []).includes(c.cwsId));
     const todayCherry = myCherry.filter((c) => c.date === today());
     return <div>
-        <div style={{ fontFamily: "'Cormorant',serif", fontSize: 26, fontWeight: 700, color: C.text, marginBottom: 4 }}>My Dashboard</div>
+        <div style={{ fontFamily: "'Inter',sans-serif", fontSize: 22, fontWeight: 700, color: C.text, letterSpacing: '-0.4px', marginBottom: 4 }}>My Dashboard</div>
         <div style={{ fontSize: 13, color: C.textMuted, marginBottom: 18 }}>{ROLES[u.role]?.label} · {myCws?.name}</div>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(130px,1fr))", gap: 12, marginBottom: 18 }}>
           <SC label="Today's Deliveries" value={todayCherry.length} color={C.coffee} />
-          <SC label="Today's kg (Standard)" value={fmtKg(todayCherry.reduce((s, c) => s + c.standardKg, 0))} color={C.coffeeLight} />
-          <SC label="Today's Total Paid" value={fmtRWF(todayCherry.reduce((s, c) => s + c.totalPaid, 0))} color={C.gold} />
+          <SC label="Today's kg (Standard)" value={fmtKg(todayCherry.reduce((s, c) => s + (+c.standardKg || 0), 0))} color={C.coffeeLight} />
+          <SC label="Today's Total Paid" value={fmtRWF(todayCherry.reduce((s, c) => s + (+c.totalPaid || 0), 0))} color={C.gold} />
         </div>
-        <div style={{ background: C.bgCard, border: `1px solid ${C.border}`, borderRadius: 12, overflow: "hidden" }}>
+        <div style={{ background: C.gradCard, border: `1px solid ${C.border}`, borderRadius: 14, overflow: "hidden" }}>
           <div style={{ padding: "12px 18px", borderBottom: `1px solid ${C.border}`, fontWeight: 700, fontSize: 13 }}>Recent GNR Entries</div>
           <GNRTable rows={myCherry.slice(0, 8)} cwsList={cwsList} farmers={[]} />
         </div>
@@ -1079,20 +1170,20 @@ function HomePage() {
     const pendingPayment = myCherry.filter((c) => c.status === "pending");
     const notPaid = myCherry.filter((c) => c.status === "not_paid");
     const myCashbook = cashbook.filter((c) => c.cwsId === myCwsId);
-    const cashBalance = myCashbook.reduce((s, c) => c.type === "inflow" ? s + c.amount : s - c.amount, 0);
+    const cashBalance = myCashbook.reduce((s, c) => c.type === "inflow" ? s + (+c.amount || 0) : s - c.amount, 0);
     const paidToday = myCherry.filter((c) => c.date === today() && c.status === "paid");
     return <div>
-        <div style={{ fontFamily: "'Cormorant',serif", fontSize: 26, fontWeight: 700, color: C.text, marginBottom: 4 }}>My Dashboard</div>
+        <div style={{ fontFamily: "'Inter',sans-serif", fontSize: 22, fontWeight: 700, color: C.text, letterSpacing: '-0.4px', marginBottom: 4 }}>My Dashboard</div>
         <div style={{ fontSize: 13, color: C.textMuted, marginBottom: 14 }}>{ROLES[u.role]?.label} · {myCws?.name}</div>
         {pendingPayment.length > 0 && <Alert text={`\u{1F4CB} ${pendingPayment.length} GNR(s) from clerk awaiting your payment confirmation.`} color={C.warning} />}
-        {notPaid.length > 0 && <div style={{ marginTop: 8 }}><Alert text={`\u26A0 ${notPaid.length} GNR(s) marked NOT PAID \u2014 station owes these farmers ${fmtRWF(notPaid.reduce((s, c) => s + c.totalPaid, 0))}`} color={C.danger} /></div>}
-        <div style={{ className: "kpi-grid", style: { display: "grid" }, gap: 12, marginTop: 14, marginBottom: 14 }}>
+        {notPaid.length > 0 && <div style={{ marginTop: 8 }}><Alert text={`\u26A0 ${notPaid.length} GNR(s) marked NOT PAID \u2014 station owes these farmers ${fmtRWF(notPaid.reduce((s, c) => s + (+c.totalPaid || 0), 0))}`} color={C.danger} /></div>}
+        <div className="kpi-grid" style={{ display: "grid", gap: 12, marginTop: 14, marginBottom: 14  }}>
           <SC label="Cash Balance" value={fmtRWF(cashBalance)} color={cashBalance > 5e5 ? C.success : C.danger} sub="Available at station" />
           <SC label="Pending GNRs" value={pendingPayment.length} color={pendingPayment.length > 0 ? C.warning : C.success} sub="Awaiting payment" />
           <SC label="Not Paid (owed)" value={notPaid.length} color={notPaid.length > 0 ? C.danger : C.success} sub="Farmer debts" />
-          <SC label="Paid Today" value={paidToday.length} color={C.coffee} sub={`${fmtRWF(paidToday.reduce((s, c) => s + c.totalPaid, 0))}`} />
+          <SC label="Paid Today" value={paidToday.length} color={C.coffee} sub={`${fmtRWF(paidToday.reduce((s, c) => s + (+c.totalPaid || 0), 0))}`} />
         </div>
-        {pendingPayment.length > 0 && <div style={{ background: C.bgCard, border: `1px solid ${C.warning}28`, borderRadius: 12, overflow: "hidden", marginBottom: 14 }}>
+        {pendingPayment.length > 0 && <div style={{ background: C.gradCard, border: `1px solid ${C.warning}28`, borderRadius: 12, overflow: "hidden", marginBottom: 14 }}>
             <div style={{ padding: "11px 16px", borderBottom: `1px solid ${C.border}`, fontWeight: 700, fontSize: 13, color: C.warning }}>
               GNRs Waiting for Payment
               <button onClick={() => setPage({ view: "coffee", sub: myCwsId })} style={{ ...BtnS(C.warning, true), marginLeft: 14, fontSize: 10, padding: "3px 9px" }}>Open Station →</button>
@@ -1100,7 +1191,7 @@ function HomePage() {
             <div className="tbl-wrap"><table style={{ width: "100%", borderCollapse: "collapse" }}>
               <thead><tr style={{ background: C.surface }}>{["GNR #", "Farmer", "Date", "kg", "Total to Pay"].map((h) => <Th key={h}>{h}</Th>)}</tr></thead>
               <tbody>{pendingPayment.slice(0, 5).map((gnr) => {
-      const f = farmers.find((x) => x.id === gnr.farmerId);
+      const f = (farmers2||[]).find((x) => x.id === gnr.farmerId);
       return <tr key={gnr.id} style={{ borderBottom: `1px solid ${C.border}15` }} onMouseEnter={(e) => e.currentTarget.style.background = C.surface} onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}>
                   <Td style={{ color: C.gold, fontWeight: 700 }}>{gnr.gnrNumber}</Td>
                   <Td style={{ fontWeight: 600 }}>{f?.name || gnr.farmerId}</Td>
@@ -1111,7 +1202,7 @@ function HomePage() {
     })}</tbody>
             </table></div>
           </div>}
-        <div style={{ background: C.bgCard, border: `1px solid ${C.border}`, borderRadius: 12, overflow: "hidden" }}>
+        <div style={{ background: C.gradCard, border: `1px solid ${C.border}`, borderRadius: 14, overflow: "hidden" }}>
           <div style={{ padding: "12px 18px", borderBottom: `1px solid ${C.border}`, fontWeight: 700, fontSize: 13 }}>Today's Cash Book</div>
           <CashTable rows={myCashbook.slice(0, 8)} />
         </div>
@@ -1123,48 +1214,48 @@ function HomePage() {
     const myCherry = cherry.filter((c) => c.cwsId === myCwsId);
     const myExp = expenses.filter((e) => e.cwsId === myCwsId);
     const myCash = cashbook.filter((c) => c.cwsId === myCwsId);
-    const cashBal = myCash.reduce((s, c) => c.type === "inflow" ? s + c.amount : s - c.amount, 0);
+    const cashBal = myCash.reduce((s, c) => c.type === "inflow" ? s + (+c.amount || 0) : s - c.amount, 0);
     const myFR = fundRequests.filter((f) => f.cwsId === myCwsId);
-    const totalKg = myCherry.reduce((s, c) => s + c.totalKg, 0);
-    const totalPaid = myCherry.reduce((s, c) => s + c.totalPaid, 0);
-    const totalExp2 = myExp.reduce((s, e) => s + e.amount, 0);
+    const totalKg = myCherry.reduce((s, c) => s + (+c.totalKg || 0), 0);
+    const totalPaid = myCherry.reduce((s, c) => s + (+c.totalPaid || 0), 0);
+    const totalExp2 = myExp.reduce((s, e) => s + (+e.amount || 0), 0);
     return <div>
         <div style={{ marginBottom: 18 }}>
-          <div style={{ fontFamily: "'Cormorant',serif", fontSize: 28, fontWeight: 700, color: C.text }}>Good {(/* @__PURE__ */ new Date()).getHours() < 12 ? "morning" : "afternoon"}, {u.name.split(" ")[0]}</div>
+          <div style={{ fontFamily: "'Inter',sans-serif", fontSize: 26, letterSpacing: '-0.5px', fontWeight: 700, color: C.text }}>Good {(/* @__PURE__ */ new Date()).getHours() < 12 ? "morning" : "afternoon"}, {u.name.split(" ")[0]}</div>
           <div style={{ fontSize: 13, color: C.textMuted, marginTop: 2 }}>{ROLES[u.role]?.label} · {myCws?.name} · {(/* @__PURE__ */ new Date()).toLocaleDateString("en-RW", { weekday: "long", month: "long", day: "numeric" })}</div>
         </div>
         {cashBal < 5e5 && <Alert text={`\u26A0 Low cash balance at station: ${fmtRWF(cashBal)}. Consider requesting funds from HQ.`} color={C.danger} />}
-        <div style={{ className: "kpi-grid", style: { display: "grid" }, gap: 12, marginBottom: 18, marginTop: cashBal < 5e5 ? 12 : 0 }}>
+        <div className="kpi-grid" style={{ display: "grid", gap: 12, marginBottom: 18, marginTop: cashBal < 5e5 ? 12 : 0  }}>
           <SC label="Total Cherry (kg)" value={fmtKg(totalKg)} color={C.coffee} />
           <SC label="Total Payments" value={fmtRWF(totalPaid)} color={C.danger} />
           <SC label="Total Expenses" value={fmtRWF(totalExp2)} color={C.warning} />
           <SC label="Cash Available" value={fmtRWF(cashBal)} color={cashBal > 5e5 ? C.success : C.danger} />
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(180px,1fr))", gap: 14, marginBottom: 18 }}>
-          <div style={{ background: C.bgCard, border: `1px solid ${C.border}`, borderRadius: 12, overflow: "hidden" }}>
+          <div style={{ background: C.gradCard, border: `1px solid ${C.border}`, borderRadius: 14, overflow: "hidden" }}>
             <div style={{ padding: "12px 18px", borderBottom: `1px solid ${C.border}`, fontWeight: 700, fontSize: 13 }}>Recent Cherry Deliveries</div>
             <GNRTable rows={myCherry.slice(0, 5)} cwsList={cwsList} farmers={[]} />
           </div>
-          <div style={{ background: C.bgCard, border: `1px solid ${C.border}`, borderRadius: 12, overflow: "hidden" }}>
+          <div style={{ background: C.gradCard, border: `1px solid ${C.border}`, borderRadius: 14, overflow: "hidden" }}>
             <div style={{ padding: "12px 18px", borderBottom: `1px solid ${C.border}`, fontWeight: 700, fontSize: 13 }}>Fund Requests</div>
             <FundTable rows={myFR} users={[]} short cwsList={cwsList} />
           </div>
         </div>
       </div>;
   }
-  const totalCherryKg = cherry.reduce((s, c) => s + c.totalKg, 0);
-  const totalCherryPaid = cherry.reduce((s, c) => s + c.totalPaid, 0);
-  const totalExp = expenses.reduce((s, e) => s + e.amount, 0);
-  const totalMachIncome = machTx.filter((t) => t.type === "income").reduce((s, t) => s + t.amount, 0);
+  const totalCherryKg = cherry.reduce((s, c) => s + (+c.totalKg || 0), 0);
+  const totalCherryPaid = cherry.reduce((s, c) => s + (+c.totalPaid || 0), 0);
+  const totalExp = expenses.reduce((s, e) => s + (+e.amount || 0), 0);
+  const totalMachIncome = machTx.filter((t) => t.type === "income").reduce((s, t) => s + (+t.amount || 0), 0);
   const pendingFR = fundRequests.filter((f) => ["pending_verification", "pending_approval"].includes(f.status));
   const stationData = cwsList.map((cws) => ({
     name: cws.name.replace(" CWS", ""),
-    "Cherry kg": cherry.filter((c) => c.cwsId === cws.id).reduce((s, c) => s + c.totalKg, 0),
-    "Payments": cherry.filter((c) => c.cwsId === cws.id).reduce((s, c) => s + c.totalPaid, 0)
+    "Cherry kg": cherry.filter((c) => c.cwsId === cws.id).reduce((s, c) => s + (+c.totalKg || 0), 0),
+    "Payments (k RWF)": +(cherry.filter((c) => c.cwsId === cws.id).reduce((s, c) => s + (+c.totalPaid || 0), 0) / 1000).toFixed(1)
   }));
   return <div>
       <div style={{ marginBottom: 18 }}>
-        <div style={{ fontFamily: "'Cormorant',serif", fontSize: 28, fontWeight: 700, color: C.text }}>Good {(/* @__PURE__ */ new Date()).getHours() < 12 ? "morning" : "afternoon"}, {u.name.split(" ")[0]}</div>
+        <div style={{ fontFamily: "'Inter',sans-serif", fontSize: 26, letterSpacing: '-0.5px', fontWeight: 700, color: C.text }}>Good {(/* @__PURE__ */ new Date()).getHours() < 12 ? "morning" : "afternoon"}, {u.name.split(" ")[0]}</div>
         <div style={{ fontSize: 13, color: C.textMuted, marginTop: 2 }}>{ROLES[u.role]?.label} · {(/* @__PURE__ */ new Date()).toLocaleDateString("en-RW", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}</div>
       </div>
       <AlertsPanel />
@@ -1181,13 +1272,13 @@ function HomePage() {
             </div>;
   })}
         </div>}
-      <div style={{ className: "kpi-grid", style: { display: "grid" }, gap: 12, marginBottom: 18 }}>
+      <div className="kpi-grid" style={{ display: "grid", gap: 12, marginBottom: 18  }}>
         <SC label="Total Cherry Purchased" value={fmtKg(totalCherryKg)} color={C.coffee} sub="All stations combined" />
         <SC label="Total Cherry Payments" value={fmtRWF(totalCherryPaid)} color={C.danger} sub="Paid to farmers" />
         <SC label="Total Expenses" value={fmtRWF(totalExp)} color={C.warning} sub="All stations" />
         <SC label="Machine Revenue" value={fmtRWF(totalMachIncome)} color={C.machinery} sub="Bender Machine" />
       </div>
-      <h3 style={{ fontFamily: "'Cormorant',serif", fontSize: 17, fontWeight: 700, color: C.text, marginBottom: 12 }}>Business Units</h3>
+      <h3 style={{ fontFamily: "'Inter',sans-serif", fontSize: 16, letterSpacing: '-0.2px', fontWeight: 700, color: C.text, marginBottom: 12 }}>Business Units</h3>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(130px,1fr))", gap: 14, marginBottom: 18 }}>
         <BizCard
     id="coffee"
@@ -1205,7 +1296,7 @@ function HomePage() {
     color={C.machinery}
     colorLight={C.machineryLight}
     colorBg={C.machineryBg}
-    stats={[{ l: "Revenue", v: fmtRWF(totalMachIncome) }, { l: "Machines", v: INIT_MACHINES.length }, { l: "Active Tasks", v: INIT_TASKS.length }]}
+    stats={[{ l: "Revenue", v: fmtRWF(totalMachIncome) }, { l: "Machines", v: (machines||[]).length }, { l: "Active Tasks", v: (tasks||[]).length }]}
   />
         <BizCard
     id="construction"
@@ -1217,19 +1308,22 @@ function HomePage() {
     stats={[{ l: "Projects", v: "0" }, { l: "Status", v: "Upcoming" }, { l: "Revenue", v: "0 RWF" }]}
   />
       </div>
-      <div style={{ background: C.bgCard, border: `1px solid ${C.border}`, borderRadius: 12, padding: "16px 16px 8px" }}>
-        <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 14 }}>Station Comparison — Cherry Purchased (kg) & Payments (RWF)</div>
-        <ResponsiveContainer width="100%" height={160}>
-          <BarChart data={stationData} barGap={4} barCategoryGap="30%">
-            <CartesianGrid strokeDasharray="3 3" stroke={C.border} vertical={false} />
-            <XAxis dataKey="name" tick={{ fill: C.textMuted, fontSize: 11 }} axisLine={false} tickLine={false} />
-            <YAxis tick={{ fill: C.textMuted, fontSize: 10 }} tickFormatter={(v) => v > 1e3 ? `${(v / 1e3).toFixed(0)}k` : v} axisLine={false} tickLine={false} />
-            <Tooltip contentStyle={{ background: C.bgCard, border: `1px solid ${C.border}`, borderRadius: 8, fontSize: 12 }} formatter={(v, n) => n === "Payments" ? fmtRWF(v) : fmtKg(v)} />
-            <Legend wrapperStyle={{ fontSize: 11 }} />
-            <Bar dataKey="Cherry kg" fill={C.coffee} radius={[4, 4, 0, 0]} />
-            <Bar dataKey="Payments" fill={C.gold} radius={[4, 4, 0, 0]} opacity={0.8} />
-          </BarChart>
-        </ResponsiveContainer>
+      <div style={{ background: C.gradCard, border: `1px solid ${C.border}`, borderRadius: 14, padding: "16px 16px 8px" }}>
+        <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 4 }}>Station Comparison — Cherry Purchased</div>
+        <div style={{ fontSize: 11, color: C.textDim, marginBottom: 12 }}>kg purchased · Payments in thousands RWF</div>
+        {stationData.every(d => d["Cherry kg"] === 0)
+          ? <div style={{ padding: "28px 0", textAlign: "center", color: C.textDim, fontSize: 12 }}>No cherry data yet — entries will appear here once clerks submit GNRs</div>
+          : <ResponsiveContainer width="100%" height={180}>
+              <BarChart data={stationData} barGap={4} barCategoryGap="30%" margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke={C.border} vertical={false} />
+                <XAxis dataKey="name" tick={{ fill: C.textMuted, fontSize: 11 }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fill: C.textMuted, fontSize: 10 }} tickFormatter={(v) => v >= 1000 ? `${(v/1000).toFixed(0)}k` : v} axisLine={false} tickLine={false} width={36} />
+                <Tooltip contentStyle={{ background: C.gradCard, border: `1px solid ${C.border}`, borderRadius: 12, fontSize: 12 }} formatter={(v, n) => [n === "Payments (k RWF)" ? fmtRWF(v * 1000) : fmtKg(v), n]} />
+                <Legend wrapperStyle={{ fontSize: 11, paddingTop: 8 }} />
+                <Bar dataKey="Cherry kg" fill={C.coffee} radius={[4, 4, 0, 0]} />
+                <Bar dataKey="Payments (k RWF)" fill={C.gold} radius={[4, 4, 0, 0]} opacity={0.8} />
+              </BarChart>
+            </ResponsiveContainer>}
       </div>
     </div>;
 }
@@ -1244,7 +1338,7 @@ function BizCard({ id, label, icon, color, colorLight, colorBg, stats = [] }) {
   }}>
       <div style={{ position: "absolute", top: -15, right: -15, fontSize: 55, opacity: 0.05 }}>{icon}</div>
       <div style={{ fontSize: 24, marginBottom: 8 }}>{icon}</div>
-      <div style={{ fontFamily: "'Cormorant',serif", fontSize: 17, fontWeight: 700, color: colorLight, marginBottom: 10 }}>{label}</div>
+      <div style={{ fontFamily: "'Inter',sans-serif", fontSize: 16, letterSpacing: '-0.2px', fontWeight: 700, color: colorLight, marginBottom: 10 }}>{label}</div>
       {stats.map((s) => <div key={s.l} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 5 }}>
           <span style={{ fontSize: 10, color: C.textDim }}>{s.l}</span>
           <span style={{ fontSize: 12, fontWeight: 700, color: C.text }}>{s.v}</span>
@@ -1259,12 +1353,12 @@ function CoffeePage() {
   if (page.sub === "seasons") return <SeasonsPage onBack={() => setPage({ view: "coffee", sub: null })} />;
   if (page.sub && cwsList.find((c) => c.id === page.sub)) return <CWSDetailPage cwsId={page.sub} onBack={() => setPage({ view: "coffee", sub: null })} />;
   const activeSeason = seasons.find((s) => s.status === "active");
-  const totalKg = cherry.reduce((s, c) => s + c.totalKg, 0);
-  const totalPaid = cherry.reduce((s, c) => s + c.totalPaid, 0);
+  const totalKg = cherry.reduce((s, c) => s + (+c.totalKg || 0), 0);
+  const totalPaid = cherry.reduce((s, c) => s + (+c.totalPaid || 0), 0);
   const pendingFR = fundRequests.filter((f) => ["pending_verification", "pending_approval"].includes(f.status)).length;
   return <div>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14, flexWrap: "wrap", gap: 10 }}>
-        <div><div style={{ fontFamily: "'Cormorant',serif", fontSize: 26, fontWeight: 700, color: C.text }}>Bender Coffee</div><div style={{ fontSize: 13, color: C.textMuted }}>Cherry Purchasing · Farmer Management · Cash & Bank · Reports</div></div>
+        <div><div style={{ fontFamily: "'Inter',sans-serif", fontSize: 22, fontWeight: 700, color: C.text, letterSpacing: '-0.4px' }}>Bender Coffee</div><div style={{ fontSize: 13, color: C.textMuted }}>Cherry Purchasing · Farmer Management · Cash & Bank · Reports</div></div>
         <div style={{ display: "flex", gap: 8 }}>
           {canManageSeason(u.role) && <button onClick={() => setPage({ view: "coffee", sub: "seasons" })} style={{ ...BtnS(C.gold, true), fontSize: 11, padding: "7px 13px" }}>🗓 Seasons</button>}
           {canVerifyFunds(u.role) && pendingFR > 0 && <button onClick={() => setPage({ view: "coffee", sub: "fund_requests" })} style={{ ...BtnS(C.warning), padding: "7px 14px", fontSize: 12 }}>💰 {pendingFR} Fund Requests</button>}
@@ -1282,7 +1376,7 @@ function CoffeePage() {
           <div style={{ fontSize: 12, color: C.textMuted, marginTop: 2 }}>{canManageSeason(u.role) ? "Create and open a season before station operations can begin." : "Operations are blocked until the MD opens a new season."}</div>
           {canManageSeason(u.role) && <button onClick={() => setPage({ view: "coffee", sub: "seasons" })} style={{ ...BtnS(C.danger), marginTop: 8, fontSize: 11, padding: "5px 12px" }}>Open Season →</button>}
         </div>}
-      <div style={{ className: "kpi-grid", style: { display: "grid" }, gap: 12, marginBottom: 20 }}>
+      <div className="kpi-grid" style={{ display: "grid", gap: 12, marginBottom: 20  }}>
         <SC label="Total Cherry (kg)" value={fmtKg(totalKg)} color={C.coffee} sub={`${cherry.length} GNR records`} />
         <SC label="Farmer Payments" value={fmtRWF(totalPaid)} color={C.danger} />
         <SC label="Active Stations" value={accessible.length} color={C.success} />
@@ -1292,9 +1386,9 @@ function CoffeePage() {
         {accessible.map((cws, i) => {
     const cCherry = cherry.filter((c) => c.cwsId === cws.id);
     const cCash = cashbook.filter((c) => c.cwsId === cws.id);
-    const cashBal = cCash.reduce((s, c) => c.type === "inflow" ? s + c.amount : s - c.amount, 0);
-    const kg = cCherry.reduce((s, c) => s + c.totalKg, 0);
-    const paid = cCherry.reduce((s, c) => s + c.totalPaid, 0);
+    const cashBal = cCash.reduce((s, c) => c.type === "inflow" ? s + (+c.amount || 0) : s - c.amount, 0);
+    const kg = cCherry.reduce((s, c) => s + (+c.totalKg || 0), 0);
+    const paid = cCherry.reduce((s, c) => s + (+c.totalPaid || 0), 0);
     const pendingGNR = cCherry.filter((c) => c.status === "pending").length;
     const mySS = stationSeasons.find((ss) => ss.cwsId === cws.id && ss.status === "active");
     return <div key={cws.id} onClick={() => setPage({ view: "coffee", sub: cws.id })} style={{ background: `linear-gradient(145deg,${C.coffeeBg},${C.bgCard})`, border: `1px solid ${mySS ? C.coffee + "28" : C.border}`, borderRadius: 13, padding: "18px", cursor: "pointer", transition: "all .2s", animation: `fadeUp .3s ease ${i * 0.08}s both`, position: "relative", overflow: "hidden" }} onMouseEnter={(e) => {
@@ -1310,7 +1404,7 @@ function CoffeePage() {
                   <span style={{ fontSize: 22 }}>☕</span>
                   {mySS ? <span style={{ fontSize: 9, fontWeight: 700, padding: "2px 7px", borderRadius: 10, background: `${C.success}18`, color: C.success }}>Season Active</span> : <span style={{ fontSize: 9, fontWeight: 700, padding: "2px 7px", borderRadius: 10, background: `${C.danger}18`, color: C.danger }}>No Season</span>}
                 </div>
-                <div style={{ fontFamily: "'Cormorant',serif", fontSize: 18, fontWeight: 700, color: C.coffeeLight, marginBottom: 1 }}>{cws.name}</div>
+                <div style={{ fontFamily: "'Inter',sans-serif", fontSize: 17, letterSpacing: '-0.2px', fontWeight: 700, color: C.coffeeLight, marginBottom: 1 }}>{cws.name}</div>
                 <div style={{ fontSize: 11, color: C.textMuted, marginBottom: 10 }}>{cws.region}</div>
                 <div style={{ display: "flex", flexDirection: "column", gap: 5, borderTop: `1px solid ${C.coffee}18`, paddingTop: 9 }}>
                   {[["\u{1F352} Cherry Purchased", fmtKg(kg), C.coffeeLight], ["\u{1F4B0} Farmer Payments", fmtRWF(paid), C.danger], ["\u{1F3E6} Cash Balance", fmtRWF(cashBal), cashBal > 3e5 ? C.success : C.danger], ["\u23F3 Pending GNRs", pendingGNR, pendingGNR > 0 ? C.warning : C.success]].map(([l, v, c]) => <div key={l} style={{ display: "flex", justifyContent: "space-between" }}><span style={{ fontSize: 10, color: C.textDim }}>{l}</span><span style={{ fontSize: 11, fontWeight: 700, color: c }}>{v}</span></div>)}
@@ -1320,19 +1414,21 @@ function CoffeePage() {
             </div>;
   })}
       </div>
-      {canSeeAllStations(u.role) && <div style={{ background: C.bgCard, border: `1px solid ${C.border}`, borderRadius: 12, padding: "16px 16px 8px" }}>
+      {canSeeAllStations(u.role) && <div style={{ background: C.gradCard, border: `1px solid ${C.border}`, borderRadius: 14, padding: "16px 16px 8px" }}>
           <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 14 }}>All Stations — Cherry kg vs Farmer Payments</div>
-          <ResponsiveContainer width="100%" height={160}>
-            <BarChart data={cwsList.map((cws) => ({ name: cws.name.replace(" CWS", ""), "Cherry kg": cherry.filter((c) => c.cwsId === cws.id).reduce((s, c) => s + c.totalKg, 0), "Payments": cherry.filter((c) => c.cwsId === cws.id).reduce((s, c) => s + c.totalPaid, 0) / 1e3 }))} barGap={4}>
-              <CartesianGrid strokeDasharray="3 3" stroke={C.border} vertical={false} />
-              <XAxis dataKey="name" tick={{ fill: C.textMuted, fontSize: 11 }} axisLine={false} tickLine={false} />
-              <YAxis tick={{ fill: C.textMuted, fontSize: 10 }} axisLine={false} tickLine={false} />
-              <Tooltip contentStyle={{ background: C.bgCard, border: `1px solid ${C.border}`, borderRadius: 8, fontSize: 12 }} />
-              <Legend wrapperStyle={{ fontSize: 11 }} />
-              <Bar dataKey="Cherry kg" fill={C.coffee} radius={[4, 4, 0, 0]} />
-              <Bar dataKey="Payments" fill={C.gold} radius={[4, 4, 0, 0]} opacity={0.8} />
-            </BarChart>
-          </ResponsiveContainer>
+          {cwsList.every(cws => cherry.filter(c => c.cwsId === cws.id).length === 0)
+            ? <div style={{ padding: "28px 0", textAlign: "center", color: C.textDim, fontSize: 12 }}>No cherry entries yet across any station</div>
+            : <ResponsiveContainer width="100%" height={180}>
+                <BarChart data={cwsList.map((cws) => ({ name: cws.name.replace(" CWS", ""), "Cherry kg": cherry.filter((c) => c.cwsId === cws.id).reduce((s, c) => s + (+c.totalKg || 0), 0), "Payments (k RWF)": +(cherry.filter((c) => c.cwsId === cws.id).reduce((s, c) => s + (+c.totalPaid || 0), 0) / 1000).toFixed(1) }))} barGap={4} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke={C.border} vertical={false} />
+                  <XAxis dataKey="name" tick={{ fill: C.textMuted, fontSize: 11 }} axisLine={false} tickLine={false} />
+                  <YAxis tick={{ fill: C.textMuted, fontSize: 10 }} tickFormatter={(v) => v >= 1000 ? `${(v/1000).toFixed(0)}k` : v} axisLine={false} tickLine={false} width={36} />
+                  <Tooltip contentStyle={{ background: C.gradCard, border: `1px solid ${C.border}`, borderRadius: 12, fontSize: 12 }} formatter={(v, n) => [n === "Payments (k RWF)" ? fmtRWF(v * 1000) : fmtKg(v), n]} />
+                  <Legend wrapperStyle={{ fontSize: 11, paddingTop: 8 }} />
+                  <Bar dataKey="Cherry kg" fill={C.coffee} radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="Payments (k RWF)" fill={C.gold} radius={[4, 4, 0, 0]} opacity={0.8} />
+                </BarChart>
+              </ResponsiveContainer>}
         </div>}
     </div>;
 }
@@ -1373,7 +1469,7 @@ function SeasonsPage({ onBack }) {
   return <div>
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20 }}>
         <button onClick={onBack} style={{ ...BtnS(C.border, false, true), padding: "6px 12px", fontSize: 12 }}>← Back</button>
-        <div><div style={{ fontFamily: "'Cormorant',serif", fontSize: 22, fontWeight: 700, color: C.goldLight }}>Season Management</div>
+        <div><div style={{ fontFamily: "'Inter',sans-serif", fontSize: 20, letterSpacing: '-0.3px', fontWeight: 700, color: C.goldLight }}>Season Management</div>
         <div style={{ fontSize: 12, color: C.textMuted }}>MD creates & closes seasons · Stations join individually</div></div>
         {canManageSeason(u.role) && !activeSeason && <button onClick={() => setShowForm(true)} style={{ ...BtnS(C.success), marginLeft: "auto", padding: "8px 16px", fontSize: 12 }}>+ Open New Season</button>}
         {canManageSeason(u.role) && activeSeason && <button onClick={() => setShowEnrollForm(activeSeason.id)} style={{ ...BtnS(C.coffee, true), marginLeft: "auto", padding: "7px 13px", fontSize: 11 }}>+ Enroll Station</button>}
@@ -1381,10 +1477,10 @@ function SeasonsPage({ onBack }) {
       {seasons.map((season) => {
     const seasonSS = stationSeasons.filter((ss) => ss.seasonId === season.id);
     const isActive = season.status === "active";
-    return <div key={season.id} style={{ background: C.bgCard, border: `1px solid ${isActive ? C.success + "28" : C.border}`, borderRadius: 12, marginBottom: 14, overflow: "hidden" }}>
+    return <div key={season.id} style={{ background: C.gradCard, border: `1px solid ${isActive ? C.success + "28" : C.border}`, borderRadius: 12, marginBottom: 14, overflow: "hidden" }}>
             <div style={{ padding: "14px 18px", borderBottom: `1px solid ${C.border}`, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
               <div>
-                <div style={{ fontFamily: "'Cormorant',serif", fontSize: 18, fontWeight: 700, color: isActive ? C.success : C.textMuted }}>{season.name}</div>
+                <div style={{ fontFamily: "'Inter',sans-serif", fontSize: 17, letterSpacing: '-0.2px', fontWeight: 700, color: isActive ? C.success : C.textMuted }}>{season.name}</div>
                 <div style={{ fontSize: 11, color: C.textMuted }}>{season.startDate} → {season.endDate || "Open ended"} · Std Rate: <b style={{ color: C.gold }}>{season.rateStandard} RWF/kg</b> · Flt Rate: <b style={{ color: C.gold }}>{season.rateFlotant} RWF/kg</b></div>
                 {season.notes && <div style={{ fontSize: 11, color: C.textDim, marginTop: 2 }}>{season.notes}</div>}
               </div>
@@ -1475,22 +1571,25 @@ function CWSDetailPage({ cwsId, onBack }) {
   const myDebts = debts.filter((d) => d.cwsId === cwsId);
   const myStock = stock.filter((s) => s.cwsId === cwsId);
   const myFR = fundRequests.filter((f) => f.cwsId === cwsId);
-  const cashBalance = myCashbook.reduce((s, c) => c.type === "inflow" ? s + c.amount : s - c.amount, 0);
-  const bankBalance = myBank.reduce((s, b) => b.type === "credit" ? s + b.amount : s - b.amount, 0);
-  const totalKg = myCherry.reduce((s, c) => s + c.totalKg, 0);
-  const totalStdKg = myCherry.reduce((s, c) => s + c.standardKg, 0);
-  const totalFltKg = myCherry.reduce((s, c) => s + c.flotantKg, 0);
-  const totalPaid = myCherry.reduce((s, c) => s + c.totalPaid, 0);
-  const totalExp = myExp.reduce((s, e) => s + e.amount, 0);
-  const exploitableExp = myExp.filter((e) => e.exploitable).reduce((s, e) => s + e.amount, 0);
-  const nonExploitableExp = myExp.filter((e) => !e.exploitable).reduce((s, e) => s + e.amount, 0);
+  const cashBalance = myCashbook.reduce((s, c) => c.type === "inflow" ? s + (+c.amount || 0) : s - c.amount, 0);
+  const bankBalance = myBank.reduce((s, b) => b.type === "credit" ? s + (+b.amount || 0) : s - b.amount, 0);
+  const totalKg = myCherry.reduce((s, c) => s + (+c.totalKg || 0), 0);
+  const totalStdKg = myCherry.reduce((s, c) => s + (+c.standardKg || 0), 0);
+  const totalFltKg = myCherry.reduce((s, c) => s + (+c.flotantKg || 0), 0);
+  const totalPaid = myCherry.reduce((s, c) => s + (+c.totalPaid || 0), 0);
+  const totalExp = myExp.reduce((s, e) => s + (+e.amount || 0), 0);
+  const exploitableExp = myExp.filter((e) => e.exploitable).reduce((s, e) => s + (+e.amount || 0), 0);
+  const nonExploitableExp = myExp.filter((e) => !e.exploitable).reduce((s, e) => s + (+e.amount || 0), 0);
   const calcCherry = (f) => {
-    const std = (+f.standardKg || 0) * (+f.rateStandard || 0);
-    const flt = (+f.flotantKg || 0) * (+f.rateFlotant || 0);
+    const stdKg = +f.standardKg || 0;
+    const fltKg = +f.flotantKg  || 0;
+    const std   = stdKg * (+f.rateStandard || 0);
+    const flt   = fltKg * (+f.rateFlotant  || 0);
     const total = std + flt;
-    const totalKgCalc = (+f.standardKg || 0) + (+f.flotantKg || 0);
+    const totalKgCalc = stdKg + fltKg;
     const avg = totalKgCalc > 0 ? total / totalKgCalc : 0;
-    return { paymentStandard: std, paymentFlotant: flt, totalPaid: total, avgRate: +avg.toFixed(1) };
+    // totalKg MUST be returned as a number — cherry form values are strings
+    return { totalKg: totalKgCalc, paymentStandard: std, paymentFlotant: flt, totalPaid: total, avgRate: +avg.toFixed(1) };
   };
   const cherryCalc = calcCherry(cherryForm);
   const saveFarmer = () => {
@@ -1502,8 +1601,12 @@ function CWSDetailPage({ cwsId, onBack }) {
   };
   const saveCherry = () => {
     if (!cherryForm.farmerId || !cherryForm.gnrNumber || !cherryForm.standardKg) return;
+    if (cherry.some((c) => c.gnrNumber === cherryForm.gnrNumber && c.cwsId === cwsId)) {
+      addNote(`GNR number ${cherryForm.gnrNumber} already exists at this station`, "danger");
+      return;
+    }
     const calc = calcCherry(cherryForm);
-    const rec = { ...cherryForm, id: `ch${Date.now()}`, cwsId, ...calc, standardKg: +cherryForm.standardKg, flotantKg: +cherryForm.flotantKg || 0, rateStandard: +cherryForm.rateStandard, rateFlotant: +cherryForm.rateFlotant, paymentMethod: null, status: "pending", by: u.id, paidBy: null, paidAt: null, notes: cherryForm.notes || "" };
+    const rec = { ...cherryForm, id: `ch${Date.now()}`, cwsId, ...calc, standardKg: +cherryForm.standardKg || 0, flotantKg: +cherryForm.flotantKg || 0, totalKg: calc.totalKg, rateStandard: +cherryForm.rateStandard || 0, rateFlotant: +cherryForm.rateFlotant || 0, paymentMethod: null, status: "pending", by: u.id, paidBy: null, paidAt: null, notes: cherryForm.notes || "" };
     setCherry((p) => [rec, ...p]);
     setShowCherryForm(false);
     setCherryForm({ date: today(), farmerId: "", gnrNumber: "", standardKg: "", flotantKg: "", rateStandard: "155", rateFlotant: "80", notes: "" });
@@ -1580,13 +1683,13 @@ function CWSDetailPage({ cwsId, onBack }) {
         <button onClick={onBack} style={{ ...BtnS(C.border, false, true), padding: "6px 12px", fontSize: 12 }}>← Back</button>
         <div style={{ width: 40, height: 40, borderRadius: 10, background: `${C.coffee}18`, border: `1px solid ${C.coffee}35`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>☕</div>
         <div>
-          <div style={{ fontFamily: "'Cormorant',serif", fontSize: 22, fontWeight: 700, color: C.coffeeLight }}>{cws.name}</div>
+          <div style={{ fontFamily: "'Inter',sans-serif", fontSize: 20, letterSpacing: '-0.3px', fontWeight: 700, color: C.coffeeLight }}>{cws.name}</div>
           <div style={{ fontSize: 12, color: C.textMuted }}>{cws.region}</div>
         </div>
         <div style={{ marginLeft: "auto", display: "flex", gap: 7, flexWrap: "wrap", justifyContent: "flex-end" }}>
           {canEnterCherry(u.role) && <button onClick={() => setShowCherryForm(true)} style={{ ...BtnS(C.coffee), fontSize: 11, padding: "6px 12px" }}>🍒 Cherry Entry</button>}
-          {canRequestFunds(u.role) && ((u.cwsAccess||[])?.includes(cwsId) || canSeeAllStations(u.role)) && <button onClick={() => setShowFundReqForm(true)} style={{ ...BtnS(C.gold, true), fontSize: 11, padding: "6px 12px" }}>💰 Request Funds</button>}
-          {canRegisterFarmer(u.role) && ((u.cwsAccess||[])?.includes(cwsId) || canSeeAllStations(u.role)) && <button onClick={() => setShowFarmerForm(true)} style={{ ...BtnS(C.info, true), fontSize: 11, padding: "6px 12px" }}>👨‍🌾 Register Farmer</button>}
+          {canRequestFunds(u.role) && (u.cwsAccess?.includes(cwsId) || canSeeAllStations(u.role)) && <button onClick={() => setShowFundReqForm(true)} style={{ ...BtnS(C.gold, true), fontSize: 11, padding: "6px 12px" }}>💰 Request Funds</button>}
+          {canRegisterFarmer(u.role) && (u.cwsAccess?.includes(cwsId) || canSeeAllStations(u.role)) && <button onClick={() => setShowFarmerForm(true)} style={{ ...BtnS(C.info, true), fontSize: 11, padding: "6px 12px" }}>👨‍🌾 Register Farmer</button>}
           {canManageCash(u.role) && <button onClick={() => setShowCashForm(true)} style={{ ...BtnS(C.info, true), fontSize: 11, padding: "6px 12px" }}>+ Cash Entry</button>}
           {canRecordExpense(u.role) && <button onClick={() => setShowExpForm(true)} style={{ ...BtnS(C.warning, true), fontSize: 11, padding: "6px 12px" }}>+ Expense</button>}
         </div>
@@ -1598,24 +1701,24 @@ function CWSDetailPage({ cwsId, onBack }) {
     /* ─── OVERVIEW ─────────────────────────────────────── */
   }
       {tab === "overview" && <div>
-          <div style={{ className: "kpi-grid", style: { display: "grid" }, gap: 12, marginBottom: 16 }}>
+          <div className="kpi-grid" style={{ display: "grid", gap: 12, marginBottom: 16  }}>
             <SC label="Total Cherry (kg)" value={fmtKg(totalKg)} color={C.coffee} />
             <SC label="Standard kg" value={fmtKg(totalStdKg)} color={C.coffeeLight} />
             <SC label="Flotant kg" value={fmtKg(totalFltKg)} color={C.warning} />
             <SC label="Farmers Served" value={new Set(myCherry.map((c) => c.farmerId)).size} color={C.info} />
           </div>
-          <div style={{ className: "kpi-grid", style: { display: "grid" }, gap: 12, marginBottom: 16 }}>
+          <div className="kpi-grid" style={{ display: "grid", gap: 12, marginBottom: 16  }}>
             <SC label="Total Farmer Payments" value={fmtRWF(totalPaid)} color={C.danger} />
             <SC label="Total Expenses" value={fmtRWF(totalExp)} color={C.warning} />
             <SC label="Cash Balance" value={fmtRWF(cashBalance)} color={cashBalance > 3e5 ? C.success : C.danger} />
             <SC label="Bank Balance" value={fmtRWF(bankBalance)} color={C.info} />
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(180px,1fr))", gap: 14, marginBottom: 16 }}>
-            <div style={{ background: C.bgCard, border: `1px solid ${C.border}`, borderRadius: 12, padding: "14px 16px 8px" }}>
+            <div style={{ background: C.gradCard, border: `1px solid ${C.border}`, borderRadius: 14, padding: "14px 16px 8px" }}>
               <div style={{ fontWeight: 700, fontSize: 12, marginBottom: 12, color: C.textMuted, textTransform: "uppercase", letterSpacing: "1px" }}>Recent Cherry Deliveries</div>
               <GNRTable rows={myCherry.slice(0, 5)} cwsList={[cws]} farmers={myCwsFarmers} />
             </div>
-            <div style={{ background: C.bgCard, border: `1px solid ${C.border}`, borderRadius: 12, padding: "14px 16px 8px" }}>
+            <div style={{ background: C.gradCard, border: `1px solid ${C.border}`, borderRadius: 14, padding: "14px 16px 8px" }}>
               <div style={{ fontWeight: 700, fontSize: 12, marginBottom: 12, color: C.textMuted, textTransform: "uppercase", letterSpacing: "1px" }}>Recent Expenses</div>
               <ExpTable rows={myExp.slice(0, 5)} />
             </div>
@@ -1634,7 +1737,7 @@ function CWSDetailPage({ cwsId, onBack }) {
             <div style={{ fontSize: 13, color: C.textMuted }}>{myCwsFarmers.length} registered farmers at {cws.name}</div>
             {canRegisterFarmer(u.role) && <button onClick={() => setShowFarmerForm(true)} style={{ ...BtnS(C.coffee), fontSize: 11, padding: "7px 13px" }}>+ Register Farmer</button>}
           </div>
-          <div style={{ background: C.bgCard, border: `1px solid ${C.border}`, borderRadius: 12, overflow: "hidden" }}>
+          <div style={{ background: C.gradCard, border: `1px solid ${C.border}`, borderRadius: 14, overflow: "hidden" }}>
             {myCwsFarmers.length === 0 ? <ES text="No farmers registered yet" /> : <div className="tbl-wrap"><table style={{ width: "100%", borderCollapse: "collapse" }}>
                 <thead><tr style={{ background: C.surface }}>{["Farmer ID", "Name", "Group", "Phone", "Balance", "Status"].map((h) => <Th key={h}>{h}</Th>)}</tr></thead>
                 <tbody>{myCwsFarmers.map((f) => <tr key={f.id} style={{ borderBottom: `1px solid ${C.border}15` }} onMouseEnter={(e) => e.currentTarget.style.background = C.surface} onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}>
@@ -1656,7 +1759,7 @@ function CWSDetailPage({ cwsId, onBack }) {
           {
     /* Cashier: pending GNRs queue */
   }
-          {canPayGNR(u.role) && myCherry.filter((c) => c.status === "pending").length > 0 && <div style={{ background: C.bgCard, border: `1px solid ${C.warning}28`, borderRadius: 12, overflow: "hidden", marginBottom: 14 }}>
+          {canPayGNR(u.role) && myCherry.filter((c) => c.status === "pending").length > 0 && <div style={{ background: C.gradCard, border: `1px solid ${C.warning}28`, borderRadius: 12, overflow: "hidden", marginBottom: 14 }}>
               <div style={{ padding: "11px 16px", borderBottom: `1px solid ${C.border}`, fontWeight: 700, fontSize: 13, color: C.warning }}>
                 ⏳ GNRs Awaiting Payment ({myCherry.filter((c) => c.status === "pending").length})
               </div>
@@ -1687,7 +1790,7 @@ function CWSDetailPage({ cwsId, onBack }) {
           {
     /* Not paid — station owes these farmers */
   }
-          {myCherry.filter((c) => c.status === "not_paid").length > 0 && <div style={{ background: C.bgCard, border: `1px solid ${C.danger}28`, borderRadius: 12, overflow: "hidden", marginBottom: 14 }}>
+          {myCherry.filter((c) => c.status === "not_paid").length > 0 && <div style={{ background: C.gradCard, border: `1px solid ${C.danger}28`, borderRadius: 12, overflow: "hidden", marginBottom: 14 }}>
               <div style={{ padding: "11px 16px", borderBottom: `1px solid ${C.border}`, fontWeight: 700, fontSize: 13, color: C.danger }}>
                 ⚠ Not Paid — Station Owes These Farmers ({myCherry.filter((c) => c.status === "not_paid").length})
               </div>
@@ -1710,13 +1813,13 @@ function CWSDetailPage({ cwsId, onBack }) {
   })}</tbody>
               </table></div>
             </div>}
-          <div style={{ className: "kpi-grid", style: { display: "grid" }, gap: 12, marginBottom: 16 }}>
+          <div className="kpi-grid" style={{ display: "grid", gap: 12, marginBottom: 16  }}>
             <SC label="Total Cherry kg" value={fmtKg(totalKg)} color={C.coffee} />
             <SC label="Standard kg" value={fmtKg(totalStdKg)} color={C.coffeeLight} />
             <SC label="Flotant kg" value={fmtKg(totalFltKg)} color={C.warning} />
             <SC label="Total Paid" value={fmtRWF(totalPaid)} color={C.danger} />
           </div>
-          <div style={{ background: C.bgCard, border: `1px solid ${C.border}`, borderRadius: 12, overflow: "hidden" }}>
+          <div style={{ background: C.gradCard, border: `1px solid ${C.border}`, borderRadius: 14, overflow: "hidden" }}>
             <div style={{ padding: "11px 16px", borderBottom: `1px solid ${C.border}`, fontWeight: 700, fontSize: 13 }}>All GNR Records</div>
             <GNRTable rows={myCherry} cwsList={[cws]} farmers={myCwsFarmers} full />
           </div>
@@ -1729,15 +1832,15 @@ function CWSDetailPage({ cwsId, onBack }) {
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(130px,1fr))", gap: 12, marginBottom: 16 }}>
             <SC label="Cash Book Balance" value={fmtRWF(cashBalance)} color={cashBalance > 0 ? C.success : C.danger} sub="Station cash on hand" />
             <SC label="Bank Balance" value={fmtRWF(bankBalance)} color={C.info} sub="Station bank account" />
-            <SC label="Total Inflows" value={fmtRWF(myCashbook.filter((c) => c.type === "inflow").reduce((s, c) => s + c.amount, 0))} color={C.success} />
+            <SC label="Total Inflows" value={fmtRWF(myCashbook.filter((c) => c.type === "inflow").reduce((s, c) => s + (+c.amount || 0), 0))} color={C.success} />
           </div>
           <Tabs tabs={["cashbook", "bank"]} labels={["Cash Book", "Bank Transactions"]} active={tab === "cash" ? "cashbook" : tab} onChange={(t) => {
   }} color={C.coffee} />
-          <div style={{ background: C.bgCard, border: `1px solid ${C.border}`, borderRadius: 12, overflow: "hidden", marginBottom: 14 }}>
+          <div style={{ background: C.gradCard, border: `1px solid ${C.border}`, borderRadius: 14, overflow: "hidden", marginBottom: 14 }}>
             <div style={{ padding: "11px 16px", borderBottom: `1px solid ${C.border}`, fontWeight: 700, fontSize: 13 }}>Cash Book</div>
             <CashTable rows={myCashbook} />
           </div>
-          <div style={{ background: C.bgCard, border: `1px solid ${C.border}`, borderRadius: 12, overflow: "hidden" }}>
+          <div style={{ background: C.gradCard, border: `1px solid ${C.border}`, borderRadius: 14, overflow: "hidden" }}>
             <div style={{ padding: "11px 16px", borderBottom: `1px solid ${C.border}`, fontWeight: 700, fontSize: 13 }}>Bank Transactions</div>
             <BankTable rows={myBank} />
           </div>
@@ -1757,7 +1860,7 @@ function CWSDetailPage({ cwsId, onBack }) {
   }
           {myExp.filter((e) => e.status === "pending").length > 0 && canApproveExpense(u.role) && <div style={{ marginBottom: 14 }}>
               <Alert text={`\u23F3 ${myExp.filter((e) => e.status === "pending").length} expense(s) submitted by cashier awaiting your approval.`} color={C.warning} />
-              <div style={{ background: C.bgCard, border: `1px solid ${C.warning}28`, borderRadius: 12, overflow: "hidden", marginTop: 8 }}>
+              <div style={{ background: C.gradCard, border: `1px solid ${C.warning}28`, borderRadius: 12, overflow: "hidden", marginTop: 8 }}>
                 <div style={{ padding: "10px 16px", borderBottom: `1px solid ${C.border}`, fontWeight: 700, fontSize: 12, color: C.warning }}>Pending Approval</div>
                 <div className="tbl-wrap"><table style={{ width: "100%", borderCollapse: "collapse" }}>
                   <thead><tr style={{ background: C.surface }}>{["Date", "Category", "Description", "Amount", "Action"].map((h) => <Th key={h}>{h}</Th>)}</tr></thead>
@@ -1777,11 +1880,11 @@ function CWSDetailPage({ cwsId, onBack }) {
           {
     /* By category */
   }
-          <div style={{ background: C.bgCard, border: `1px solid ${C.border}`, borderRadius: 12, padding: "14px 16px", marginBottom: 14 }}>
+          <div style={{ background: C.gradCard, border: `1px solid ${C.border}`, borderRadius: 14, padding: "14px 16px", marginBottom: 14 }}>
             <div style={{ fontWeight: 700, fontSize: 12, marginBottom: 10, color: C.textMuted, textTransform: "uppercase", letterSpacing: "1px" }}>By Category</div>
-            <div style={{ className: "kpi-grid", style: { display: "grid" }, gap: 8 }}>
+            <div className="kpi-grid" style={{ display: "grid", gap: 8  }}>
               {EXPENSE_CATS.map((cat) => {
-    const amt = myExp.filter((e) => e.category === cat && e.status === "approved").reduce((s, e) => s + e.amount, 0);
+    const amt = myExp.filter((e) => e.category === cat && e.status === "approved").reduce((s, e) => s + (+e.amount || 0), 0);
     if (!amt) return null;
     return <div key={cat} style={{ background: C.surface, borderRadius: 8, padding: "8px 10px" }}>
                   <div style={{ fontSize: 10, color: C.textDim, marginBottom: 3 }}>{cat}</div>
@@ -1790,7 +1893,7 @@ function CWSDetailPage({ cwsId, onBack }) {
   }).filter(Boolean)}
             </div>
           </div>
-          <div style={{ background: C.bgCard, border: `1px solid ${C.border}`, borderRadius: 12, overflow: "hidden" }}>
+          <div style={{ background: C.gradCard, border: `1px solid ${C.border}`, borderRadius: 14, overflow: "hidden" }}>
             <div style={{ padding: "11px 16px", borderBottom: `1px solid ${C.border}`, fontWeight: 700, fontSize: 13 }}>Expense Ledger</div>
             <ExpTable rows={myExp} full />
           </div>
@@ -1805,11 +1908,11 @@ function CWSDetailPage({ cwsId, onBack }) {
             {canManageCash(u.role) && <button onClick={() => setShowDebtForm(true)} style={{ ...BtnS(C.danger, true), fontSize: 11, padding: "7px 13px" }}>+ Add Debt</button>}
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(130px,1fr))", gap: 12, marginBottom: 14 }}>
-            <SC label="Debt Given to Others" value={fmtRWF(myDebts.filter((d) => d.type === "debt_given").reduce((s, d) => s + d.amount, 0))} color={C.danger} />
-            <SC label="Debt Owed to CWS" value={fmtRWF(myDebts.filter((d) => d.type === "debt_to_others").reduce((s, d) => s + d.amount, 0))} color={C.warning} />
-            <SC label="Outstanding Balance" value={fmtRWF(myDebts.reduce((s, d) => s + d.balance, 0))} color={C.info} />
+            <SC label="Debt Given to Others" value={fmtRWF(myDebts.filter((d) => d.type === "debt_given").reduce((s, d) => s + (+d.amount || 0), 0))} color={C.danger} />
+            <SC label="Debt Owed to CWS" value={fmtRWF(myDebts.filter((d) => d.type === "debt_to_others").reduce((s, d) => s + (+d.amount || 0), 0))} color={C.warning} />
+            <SC label="Outstanding Balance" value={fmtRWF(myDebts.reduce((s, d) => s + (+d.balance || 0), 0))} color={C.info} />
           </div>
-          <div style={{ background: C.bgCard, border: `1px solid ${C.border}`, borderRadius: 12, overflow: "hidden" }}>
+          <div style={{ background: C.gradCard, border: `1px solid ${C.border}`, borderRadius: 14, overflow: "hidden" }}>
             {myDebts.length === 0 ? <ES text="No debts or liabilities recorded" /> : <div className="tbl-wrap"><table style={{ width: "100%", borderCollapse: "collapse" }}>
                 <thead><tr style={{ background: C.surface }}>{["Date", "Type", "Party", "Description", "Amount", "Balance", "Status"].map((h) => <Th key={h}>{h}</Th>)}</tr></thead>
                 <tbody>{myDebts.map((d) => <tr key={d.id} style={{ borderBottom: `1px solid ${C.border}15` }} onMouseEnter={(e) => e.currentTarget.style.background = C.surface} onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}>
@@ -1836,9 +1939,9 @@ function CWSDetailPage({ cwsId, onBack }) {
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(130px,1fr))", gap: 12, marginBottom: 14 }}>
             <SC label="Total Tonnes In" value={`${myStock.reduce((s, sk) => s + sk.tonnesIn, 0).toFixed(2)} T`} color={C.coffee} />
             <SC label="Total Tonnes Out" value={`${myStock.reduce((s, sk) => s + sk.tonnesOut, 0).toFixed(2)} T`} color={C.warning} />
-            <SC label="Total Stock Value" value={fmtRWF(myStock.reduce((s, sk) => s + sk.totalValue, 0))} color={C.gold} />
+            <SC label="Total Stock Value" value={fmtRWF(myStock.reduce((s, sk) => s + (+sk.totalValue || 0), 0))} color={C.gold} />
           </div>
-          <div style={{ background: C.bgCard, border: `1px solid ${C.border}`, borderRadius: 12, overflow: "hidden" }}>
+          <div style={{ background: C.gradCard, border: `1px solid ${C.border}`, borderRadius: 14, overflow: "hidden" }}>
             {myStock.length === 0 ? <ES text="No stock movements recorded" /> : <div className="tbl-wrap"><table style={{ width: "100%", borderCollapse: "collapse" }}>
                 <thead><tr style={{ background: C.surface }}>{["Date", "Description", "Grade", "Tonnes In", "Tonnes Out", "Balance", "Unit Cost", "Total Value", "Method"].map((h) => <Th key={h}>{h}</Th>)}</tr></thead>
                 <tbody>{myStock.map((sk) => <tr key={sk.id} style={{ borderBottom: `1px solid ${C.border}15` }} onMouseEnter={(e) => e.currentTarget.style.background = C.surface} onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}>
@@ -1860,16 +1963,16 @@ function CWSDetailPage({ cwsId, onBack }) {
     /* ─── DAILY REPORT ────────────────────────────────── */
   }
       {tab === "report" && <div>
-          <div style={{ fontFamily: "'Cormorant',serif", fontSize: 18, fontWeight: 700, color: C.text, marginBottom: 14 }}>Daily Station Report — {cws.name}</div>
+          <div style={{ fontFamily: "'Inter',sans-serif", fontSize: 17, letterSpacing: '-0.2px', fontWeight: 700, color: C.text, marginBottom: 14 }}>Daily Station Report — {cws.name}</div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(180px,1fr))", gap: 14, marginBottom: 14 }}>
-            <div style={{ background: C.bgCard, border: `1px solid ${C.coffee}28`, borderRadius: 12, padding: "16px 18px" }}>
+            <div style={{ background: C.gradCard, border: `1px solid ${C.coffee}28`, borderRadius: 12, padding: "16px 18px" }}>
               <div style={{ fontSize: 10, color: C.textDim, textTransform: "uppercase", letterSpacing: "1px", marginBottom: 12 }}>Today's Snapshot</div>
               {[
     ["Farmers Served Today", new Set(myCherry.filter((c) => c.date === today()).map((c) => c.farmerId)).size],
-    ["Total kg Purchased Today", fmtKg(myCherry.filter((c) => c.date === today()).reduce((s, c) => s + c.totalKg, 0))],
-    ["Standard kg Today", fmtKg(myCherry.filter((c) => c.date === today()).reduce((s, c) => s + c.standardKg, 0))],
-    ["Flotant kg Today", fmtKg(myCherry.filter((c) => c.date === today()).reduce((s, c) => s + c.flotantKg, 0))],
-    ["Total Payments Today", fmtRWF(myCherry.filter((c) => c.date === today()).reduce((s, c) => s + c.totalPaid, 0))],
+    ["Total kg Purchased Today", fmtKg(myCherry.filter((c) => c.date === today()).reduce((s, c) => s + (+c.totalKg || 0), 0))],
+    ["Standard kg Today", fmtKg(myCherry.filter((c) => c.date === today()).reduce((s, c) => s + (+c.standardKg || 0), 0))],
+    ["Flotant kg Today", fmtKg(myCherry.filter((c) => c.date === today()).reduce((s, c) => s + (+c.flotantKg || 0), 0))],
+    ["Total Payments Today", fmtRWF(myCherry.filter((c) => c.date === today()).reduce((s, c) => s + (+c.totalPaid || 0), 0))],
     ["Cash Available", fmtRWF(cashBalance)],
     ["Fund Requests Pending", myFR.filter((f) => f.status.includes("pending")).length]
   ].map(([l, v]) => <div key={l} style={{ display: "flex", justifyContent: "space-between", borderBottom: `1px solid ${C.border}20`, padding: "6px 0" }}>
@@ -1877,7 +1980,7 @@ function CWSDetailPage({ cwsId, onBack }) {
                   <span style={{ fontSize: 13, fontWeight: 700, color: C.text }}>{v}</span>
                 </div>)}
             </div>
-            <div style={{ background: C.bgCard, border: `1px solid ${C.coffee}28`, borderRadius: 12, padding: "16px 18px" }}>
+            <div style={{ background: C.gradCard, border: `1px solid ${C.coffee}28`, borderRadius: 12, padding: "16px 18px" }}>
               <div style={{ fontSize: 10, color: C.textDim, textTransform: "uppercase", letterSpacing: "1px", marginBottom: 12 }}>Season Consolidated</div>
               {[
     ["Total Cherry Purchased", fmtKg(totalKg)],
@@ -1886,18 +1989,18 @@ function CWSDetailPage({ cwsId, onBack }) {
     ["Total Farmer Payments", fmtRWF(totalPaid)],
     ["Total Expenses (All)", fmtRWF(totalExp)],
     ["Stock on Hand", `${myStock.reduce((s, sk) => s + sk.tonnesBalance, 0).toFixed(2)} T`],
-    ["Outstanding Debts", fmtRWF(myDebts.reduce((s, d) => s + d.balance, 0))]
+    ["Outstanding Debts", fmtRWF(myDebts.reduce((s, d) => s + (+d.balance || 0), 0))]
   ].map(([l, v]) => <div key={l} style={{ display: "flex", justifyContent: "space-between", borderBottom: `1px solid ${C.border}20`, padding: "6px 0" }}>
                   <span style={{ fontSize: 12, color: C.textMuted }}>{l}</span>
                   <span style={{ fontSize: 13, fontWeight: 700, color: C.text }}>{v}</span>
                 </div>)}
             </div>
           </div>
-          <div style={{ background: C.bgCard, border: `1px solid ${C.border}`, borderRadius: 12, padding: "14px 16px 8px" }}>
+          <div style={{ background: C.gradCard, border: `1px solid ${C.border}`, borderRadius: 14, padding: "14px 16px 8px" }}>
             <div style={{ fontWeight: 700, fontSize: 12, marginBottom: 12, color: C.textMuted, textTransform: "uppercase", letterSpacing: "1px" }}>Expense Breakdown</div>
-            <div style={{ className: "kpi-grid", style: { display: "grid" }, gap: 8 }}>
+            <div className="kpi-grid" style={{ display: "grid", gap: 8  }}>
               {EXPENSE_CATS.map((cat) => {
-    const amt = myExp.filter((e) => e.category === cat).reduce((s, e) => s + e.amount, 0);
+    const amt = myExp.filter((e) => e.category === cat).reduce((s, e) => s + (+e.amount || 0), 0);
     if (!amt) return null;
     return <div key={cat} style={{ background: C.surface, borderRadius: 8, padding: "8px 10px" }}><div style={{ fontSize: 10, color: C.textDim, marginBottom: 3 }}>{cat}</div><div style={{ fontSize: 12, fontWeight: 700, color: C.warning }}>{fmtRWF(amt)}</div></div>;
   }).filter(Boolean)}
@@ -2075,7 +2178,7 @@ function FundRequestsPage({ onBack }) {
   return <div>
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20 }}>
         <button onClick={onBack} style={{ ...BtnS(C.border, false, true), padding: "6px 12px", fontSize: 12 }}>← Back</button>
-        <div><div style={{ fontFamily: "'Cormorant',serif", fontSize: 22, fontWeight: 700, color: C.goldLight }}>Fund Requests</div><div style={{ fontSize: 12, color: C.textMuted }}>Station → HQ Ops Verification → MD Approval → Transfer</div></div>
+        <div><div style={{ fontFamily: "'Inter',sans-serif", fontSize: 20, letterSpacing: '-0.3px', fontWeight: 700, color: C.goldLight }}>Fund Requests</div><div style={{ fontSize: 12, color: C.textMuted }}>Station → HQ Ops Verification → MD Approval → Transfer</div></div>
       </div>
 
       {
@@ -2084,7 +2187,7 @@ function FundRequestsPage({ onBack }) {
       <div style={{ display: "flex", gap: 8, marginBottom: 20, alignItems: "center", flexWrap: "wrap" }}>
         {[["1. Station Manager", "Submits request", "station_manager", C.coffee], ["\u2192", null, null, C.textDim], ["2. HQ Ops Manager", "Verifies request", "hq_ops", C.purple], ["\u2192", null, null, C.textDim], ["3. Managing Director", "Approves & transfers", "md", C.gold], ["\u2192", null, null, C.textDim], ["4. HQ Finance", "Reconciles", "hq_finance", C.warning]].map((item, i) => {
     if (item[0] === "\u2192") return <span key={i} style={{ fontSize: 18, color: item[3] }}>→</span>;
-    return <div key={i} style={{ background: C.bgCard, border: `1px solid ${item[3]}30`, borderRadius: 10, padding: "10px 14px", minWidth: 130 }}>
+    return <div key={i} style={{ background: C.gradCard, border: `1px solid ${item[3]}30`, borderRadius: 10, padding: "10px 14px", minWidth: 130 }}>
             <div style={{ fontSize: 11, fontWeight: 700, color: item[3] }}>{item[0]}</div>
             <div style={{ fontSize: 10, color: C.textMuted, marginTop: 2 }}>{item[1]}</div>
           </div>;
@@ -2147,7 +2250,7 @@ function FundRequestCard({ fr, cwsList, users, canVerify, canApprove, onVerify, 
   const reqBy = users.find((u) => u.id === fr.requestedBy);
   const statusColors = { "pending_verification": C.warning, "pending_approval": C.gold, "approved": C.success, "rejected": C.danger };
   const col = statusColors[fr.status] || C.textMuted;
-  return <div style={{ background: C.bgCard, border: `1px solid ${col}28`, borderRadius: 11, padding: "16px 18px", marginBottom: 10 }}>
+  return <div style={{ background: C.gradCard, border: `1px solid ${col}28`, borderRadius: 11, padding: "16px 18px", marginBottom: 10 }}>
       <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 10 }}>
         <div>
           <div style={{ fontWeight: 700, fontSize: 14, color: C.text }}>{cws?.name} — <span style={{ color: col }}>{fmtRWF(fr.amount)}</span></div>
@@ -2170,7 +2273,7 @@ function AlertsPanel() {
   const alerts = [];
   cwsList.forEach((cws) => {
     const cb = cashbook.filter((c) => c.cwsId === cws.id);
-    const bal = cb.reduce((s, c) => c.type === "inflow" ? s + c.amount : s - c.amount, 0);
+    const bal = cb.reduce((s, c) => c.type === "inflow" ? s + (+c.amount || 0) : s - c.amount, 0);
     if (bal < 3e5) alerts.push({ type: "danger", icon: "\u{1F4B8}", msg: `Low cash at ${cws.name}: ${fmtRWF(bal)}`, cws: cws.id });
   });
   const pendExp = expenses.filter((e) => e.status === "pending");
@@ -2208,7 +2311,7 @@ function WarehousePage() {
   return <div>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 18 }}>
         <div>
-          <div style={{ fontFamily: "'Cormorant',serif", fontSize: 26, fontWeight: 700, color: C.text }}>Warehouse</div>
+          <div style={{ fontFamily: "'Inter',sans-serif", fontSize: 22, fontWeight: 700, color: C.text, letterSpacing: '-0.4px' }}>Warehouse</div>
           <div style={{ fontSize: 13, color: C.textMuted }}>Parchment Stock · Shipment Tracking</div>
         </div>
         {canSendToWarehouse(u.role) && <button onClick={() => setShowForm(true)} style={{ ...BtnS(C.gold), padding: "8px 16px", fontSize: 12 }}>+ Send to Warehouse</button>}
@@ -2218,7 +2321,7 @@ function WarehousePage() {
         <SC label="Pending Confirmation" value={pending.length} color={C.warning} />
         <SC label="Confirmed" value={confirmed.length} color={C.success} />
       </div>
-      {pending.length > 0 && canConfirmWarehouse(u.role) && <div style={{ marginBottom: 18, background: C.bgCard, border: `1px solid ${C.warning}40`, borderRadius: 12, overflow: "hidden" }}>
+      {pending.length > 0 && canConfirmWarehouse(u.role) && <div style={{ marginBottom: 18, background: C.gradCard, border: `1px solid ${C.warning}40`, borderRadius: 12, overflow: "hidden" }}>
           <div style={{ padding: "11px 16px", borderBottom: `1px solid ${C.border}`, fontWeight: 700, fontSize: 13, color: C.warning }}>Pending Confirmation</div>
           {pending.map((w) => {
     const cws = cwsList.find((c) => c.id === w.fromCwsId);
@@ -2231,7 +2334,7 @@ function WarehousePage() {
               </div>;
   })}
         </div>}
-      <div style={{ background: C.bgCard, border: `1px solid ${C.border}`, borderRadius: 12, overflow: "hidden" }}>
+      <div style={{ background: C.gradCard, border: `1px solid ${C.border}`, borderRadius: 14, overflow: "hidden" }}>
         <div style={{ padding: "11px 16px", borderBottom: `1px solid ${C.border}`, fontWeight: 700, fontSize: 13 }}>All Shipments ({warehouseStock.length})</div>
         {warehouseStock.length === 0 ? <ES text="No shipments yet" /> : <div className="tbl-wrap"><table style={{ width: "100%", borderCollapse: "collapse" }}>
           <thead><tr style={{ background: C.surface }}>{["Date", "Station", "Lot #", "Grade", "Tonnes", "Status", "Confirmed At"].map((h) => <Th key={h}>{h}</Th>)}</tr></thead>
@@ -2282,20 +2385,20 @@ function ReportsPage() {
   const fDebts = debts.filter((d) => inStation(d.cwsId));
   const fStock = stock.filter((s) => inStation(s.cwsId) && inRange(s.date));
   const fFR = fundRequests.filter((f) => inStation(f.cwsId));
-  const totalCherryKg = fCherry.reduce((s, c) => s + c.totalKg, 0);
-  const totalPaid = fCherry.reduce((s, c) => s + c.totalPaid, 0);
-  const totalExp = fExpenses.filter((e) => e.status === "approved").reduce((s, e) => s + e.amount, 0);
-  const totalMachIncome = machTx.filter((t) => t.type === "income").reduce((s, t) => s + t.amount, 0);
-  const totalStock = fStock.reduce((s, sk) => s + sk.totalValue, 0);
-  const totalDebts = fDebts.reduce((s, d) => s + d.balance, 0);
-  const expByCat = EXPENSE_CATS.map((cat) => ({ name: cat, value: fExpenses.filter((e) => e.category === cat && e.status === "approved").reduce((s, e) => s + e.amount, 0) })).filter((d) => d.value > 0);
+  const totalCherryKg = fCherry.reduce((s, c) => s + (+c.totalKg || 0), 0);
+  const totalPaid = fCherry.reduce((s, c) => s + (+c.totalPaid || 0), 0);
+  const totalExp = fExpenses.filter((e) => e.status === "approved").reduce((s, e) => s + (+e.amount || 0), 0);
+  const totalMachIncome = machTx.filter((t) => t.type === "income").reduce((s, t) => s + (+t.amount || 0), 0);
+  const totalStock = fStock.reduce((s, sk) => s + (+sk.totalValue || 0), 0);
+  const totalDebts = fDebts.reduce((s, d) => s + (+d.balance || 0), 0);
+  const expByCat = EXPENSE_CATS.map((cat) => ({ name: cat, value: fExpenses.filter((e) => e.category === cat && e.status === "approved").reduce((s, e) => s + (+e.amount || 0), 0) })).filter((d) => d.value > 0);
   const PIE_COLORS = ["#B8733A", "#3A7CA8", "#C8A84B", "#48B860", "#D44040", "#8A4EC8", "#D89830", "#7A5AC8", "#5A8A6A", "#4888C8", "#7AAABB", "#8888AA"];
   const stationRows = (filterStation === "all" ? cwsList : cwsList.filter((c) => c.id === filterStation)).map((cws) => {
     const ck = cherry.filter((c) => c.cwsId === cws.id && inRange(c.date));
     const ex = expenses.filter((e) => e.cwsId === cws.id && inRange(e.date) && e.status === "approved");
     const cb = cashbook.filter((c) => c.cwsId === cws.id && inRange(c.date));
-    const cashBal = cb.reduce((s, c) => c.type === "inflow" ? s + c.amount : s - c.amount, 0);
-    return { cws, kg: ck.reduce((s, c) => s + c.totalKg, 0), paid: ck.reduce((s, c) => s + c.totalPaid, 0), exp: ex.reduce((s, e) => s + e.amount, 0), cashBal, farmers: new Set(ck.map((c) => c.farmerId)).size };
+    const cashBal = cb.reduce((s, c) => c.type === "inflow" ? s + (+c.amount || 0) : s - c.amount, 0);
+    return { cws, kg: ck.reduce((s, c) => s + (+c.totalKg || 0), 0), paid: ck.reduce((s, c) => s + (+c.totalPaid || 0), 0), exp: ex.reduce((s, e) => s + (+e.amount || 0), 0), cashBal, farmers: new Set(ck.map((c) => c.farmerId)).size };
   });
   const exportExcel = (type) => {
     let rows = [];
@@ -2398,7 +2501,7 @@ function ReportsPage() {
   ];
   return <div>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16, flexWrap: "wrap", gap: 10 }}>
-        <div style={{ fontFamily: "'Cormorant',serif", fontSize: 24, fontWeight: 700, color: C.text }}>Consolidated Reports</div>
+        <div style={{ fontFamily: "'Inter',sans-serif", fontSize: 22, letterSpacing: '-0.4px', fontWeight: 700, color: C.text }}>Consolidated Reports</div>
         <div style={{ display: "flex", gap: 8 }}>
           <button onClick={() => exportExcel(reportType)} style={{ ...BtnS(C.success), fontSize: 11, padding: "7px 13px" }}>⬇ Export Excel</button>
           <button onClick={printReport} style={{ ...BtnS(C.info, true), fontSize: 11, padding: "7px 13px" }}>🖨 Print</button>
@@ -2439,7 +2542,7 @@ function ReportsPage() {
       {
     /* ── KPI SUMMARY ────────────────────────────────────────── */
   }
-      <div style={{ className: "kpi-grid", style: { display: "grid" }, gap: 12, marginBottom: 16 }}>
+      <div className="kpi-grid" style={{ display: "grid", gap: 12, marginBottom: 16  }}>
         <SC label="Cherry Purchased" value={fmtKg(totalCherryKg)} color={C.coffee} />
         <SC label="Farmer Payments" value={fmtRWF(totalPaid)} color={C.danger} />
         <SC label="Approved Expenses" value={fmtRWF(totalExp)} color={C.warning} />
@@ -2448,7 +2551,7 @@ function ReportsPage() {
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(130px,1fr))", gap: 12, marginBottom: 16 }}>
         <SC label="Machine Revenue" value={fmtRWF(totalMachIncome)} color={C.machinery} />
         <SC label="Outstanding Debts" value={fmtRWF(totalDebts)} color={C.info} />
-        <SC label="Approved Fund Transfers" value={fmtRWF(fFR.filter((f) => f.status === "approved").reduce((s, f) => s + f.amount, 0))} color={C.success} />
+        <SC label="Approved Fund Transfers" value={fmtRWF(fFR.filter((f) => f.status === "approved").reduce((s, f) => s + (+f.amount || 0), 0))} color={C.success} />
       </div>
 
       {
@@ -2460,13 +2563,13 @@ function ReportsPage() {
     /* ── CHERRY REPORT ──────────────────────────────────────── */
   }
       {reportType === "cherry" && <div>
-          <div style={{ className: "kpi-grid", style: { display: "grid" }, gap: 10, marginBottom: 14 }}>
+          <div className="kpi-grid" style={{ display: "grid", gap: 10, marginBottom: 14  }}>
             <SC label="GNR Records" value={fCherry.length} color={C.coffee} />
-            <SC label="Standard kg" value={fmtKg(fCherry.reduce((s, c) => s + c.standardKg, 0))} color={C.coffeeLight} />
-            <SC label="Flotant kg" value={fmtKg(fCherry.reduce((s, c) => s + c.flotantKg, 0))} color={C.warning} />
+            <SC label="Standard kg" value={fmtKg(fCherry.reduce((s, c) => s + (+c.standardKg || 0), 0))} color={C.coffeeLight} />
+            <SC label="Flotant kg" value={fmtKg(fCherry.reduce((s, c) => s + (+c.flotantKg || 0), 0))} color={C.warning} />
             <SC label="Avg Rate" value={`${fCherry.length > 0 ? (fCherry.reduce((s, c) => s + (c.avgRate||0), 0) / fCherry.length).toFixed(1) : 0} RWF/kg`} color={C.info} />
           </div>
-          <div style={{ background: C.bgCard, border: `1px solid ${C.border}`, borderRadius: 12, overflow: "hidden" }}>
+          <div style={{ background: C.gradCard, border: `1px solid ${C.border}`, borderRadius: 14, overflow: "hidden" }}>
             <div style={{ padding: "11px 16px", borderBottom: `1px solid ${C.border}`, fontWeight: 700, fontSize: 13, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <span>Cherry Purchase Records ({fCherry.length})</span>
               <button onClick={() => exportExcel("cherry")} style={{ ...BtnS(C.success, true), fontSize: 10, padding: "4px 10px" }}>⬇ CSV</button>
@@ -2480,15 +2583,17 @@ function ReportsPage() {
   }
       {reportType === "expenses" && <div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(180px,1fr))", gap: 14, marginBottom: 14 }}>
-            <div style={{ background: C.bgCard, border: `1px solid ${C.border}`, borderRadius: 12, padding: "14px 16px 8px" }}>
+            <div style={{ background: C.gradCard, border: `1px solid ${C.border}`, borderRadius: 14, padding: "14px 16px 8px" }}>
               <div style={{ fontWeight: 700, fontSize: 12, marginBottom: 12 }}>By Category (Approved)</div>
-              <ResponsiveContainer width="100%" height={160}>
-                <PieChart><Pie data={expByCat} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={60} label={({ name, percent }) => `${(percent * 100).toFixed(0)}%`} labelLine={false} style={{ fontSize: 9 }}>
-                  {expByCat.map((e, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
-                </Pie><Tooltip formatter={(v) => fmtRWF(v)} contentStyle={{ background: C.bgCard, border: `1px solid ${C.border}`, borderRadius: 8, fontSize: 11 }} /></PieChart>
-              </ResponsiveContainer>
+              {expByCat.length === 0
+                ? <div style={{ padding: "24px 0", textAlign: "center", color: C.textDim, fontSize: 12 }}>No approved expenses in range</div>
+                : <ResponsiveContainer width="100%" height={180}>
+                    <PieChart><Pie data={expByCat} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={65} label={({ name, percent }) => percent > 0.05 ? `${(percent * 100).toFixed(0)}%` : ""} labelLine={false} style={{ fontSize: 9 }}>
+                      {expByCat.map((e, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
+                    </Pie><Tooltip formatter={(v) => [fmtRWF(v), "Amount"]} contentStyle={{ background: C.gradCard, border: `1px solid ${C.border}`, borderRadius: 12, fontSize: 11 }} /></PieChart>
+                  </ResponsiveContainer>}
             </div>
-            <div style={{ background: C.bgCard, border: `1px solid ${C.border}`, borderRadius: 12, padding: "14px 16px" }}>
+            <div style={{ background: C.gradCard, border: `1px solid ${C.border}`, borderRadius: 14, padding: "14px 16px" }}>
               <div style={{ fontWeight: 700, fontSize: 12, marginBottom: 10 }}>Category Breakdown</div>
               {expByCat.map((ec, i) => <div key={ec.name} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "5px 0", borderBottom: `1px solid ${C.border}15` }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -2499,7 +2604,7 @@ function ReportsPage() {
                 </div>)}
             </div>
           </div>
-          <div style={{ background: C.bgCard, border: `1px solid ${C.border}`, borderRadius: 12, overflow: "hidden" }}>
+          <div style={{ background: C.gradCard, border: `1px solid ${C.border}`, borderRadius: 14, overflow: "hidden" }}>
             <div style={{ padding: "11px 16px", borderBottom: `1px solid ${C.border}`, fontWeight: 700, fontSize: 13, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <span>Expense Ledger ({fExpenses.length})</span>
               <button onClick={() => exportExcel("expenses")} style={{ ...BtnS(C.success, true), fontSize: 10, padding: "4px 10px" }}>⬇ CSV</button>
@@ -2513,18 +2618,18 @@ function ReportsPage() {
   }
       {reportType === "cashbook" && <div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(130px,1fr))", gap: 12, marginBottom: 14 }}>
-            <SC label="Total Cash Inflows" value={fmtRWF(fCashbook.filter((c) => c.type === "inflow").reduce((s, c) => s + c.amount, 0))} color={C.success} />
-            <SC label="Total Cash Outflows" value={fmtRWF(fCashbook.filter((c) => c.type === "outflow").reduce((s, c) => s + c.amount, 0))} color={C.danger} />
-            <SC label="Total Bank Credits" value={fmtRWF(fBank.filter((b) => b.type === "credit").reduce((s, b) => s + b.amount, 0))} color={C.info} />
+            <SC label="Total Cash Inflows" value={fmtRWF(fCashbook.filter((c) => c.type === "inflow").reduce((s, c) => s + (+c.amount || 0), 0))} color={C.success} />
+            <SC label="Total Cash Outflows" value={fmtRWF(fCashbook.filter((c) => c.type === "outflow").reduce((s, c) => s + (+c.amount || 0), 0))} color={C.danger} />
+            <SC label="Total Bank Credits" value={fmtRWF(fBank.filter((b) => b.type === "credit").reduce((s, b) => s + (+b.amount || 0), 0))} color={C.info} />
           </div>
-          <div style={{ background: C.bgCard, border: `1px solid ${C.border}`, borderRadius: 12, overflow: "hidden", marginBottom: 14 }}>
+          <div style={{ background: C.gradCard, border: `1px solid ${C.border}`, borderRadius: 14, overflow: "hidden", marginBottom: 14 }}>
             <div style={{ padding: "11px 16px", borderBottom: `1px solid ${C.border}`, fontWeight: 700, fontSize: 13, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <span>Cash Book ({fCashbook.length})</span>
               <button onClick={() => exportExcel("cashbook")} style={{ ...BtnS(C.success, true), fontSize: 10, padding: "4px 10px" }}>⬇ CSV</button>
             </div>
             <CashTable rows={fCashbook} />
           </div>
-          <div style={{ background: C.bgCard, border: `1px solid ${C.border}`, borderRadius: 12, overflow: "hidden" }}>
+          <div style={{ background: C.gradCard, border: `1px solid ${C.border}`, borderRadius: 14, overflow: "hidden" }}>
             <div style={{ padding: "11px 16px", borderBottom: `1px solid ${C.border}`, fontWeight: 700, fontSize: 13 }}>Bank Transactions ({fBank.length})</div>
             <BankTable rows={fBank} />
           </div>
@@ -2534,7 +2639,7 @@ function ReportsPage() {
     /* ── STATION SUMMARY REPORT ─────────────────────────────── */
   }
       {reportType === "station_summary" && <div>
-          <div style={{ background: C.bgCard, border: `1px solid ${C.border}`, borderRadius: 12, overflow: "hidden", marginBottom: 14 }}>
+          <div style={{ background: C.gradCard, border: `1px solid ${C.border}`, borderRadius: 14, overflow: "hidden", marginBottom: 14 }}>
             <div style={{ padding: "11px 16px", borderBottom: `1px solid ${C.border}`, fontWeight: 700, fontSize: 13, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <span>Station Summary ({stationRows.length} stations)</span>
               <button onClick={() => exportExcel("station_summary")} style={{ ...BtnS(C.success, true), fontSize: 10, padding: "4px 10px" }}>⬇ CSV</button>
@@ -2557,25 +2662,29 @@ function ReportsPage() {
             </table></div>
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(180px,1fr))", gap: 14 }}>
-            <div style={{ background: C.bgCard, border: `1px solid ${C.border}`, borderRadius: 12, padding: "14px 16px 8px" }}>
+            <div style={{ background: C.gradCard, border: `1px solid ${C.border}`, borderRadius: 14, padding: "14px 16px 8px" }}>
               <div style={{ fontWeight: 700, fontSize: 12, marginBottom: 12 }}>Cherry kg per Station</div>
-              <ResponsiveContainer width="100%" height={160}>
-                <BarChart data={stationRows.map((r) => ({ name: r.cws.name.replace(" CWS", ""), kg: r.kg }))}>
-                  <CartesianGrid strokeDasharray="3 3" stroke={C.border} vertical={false} />
-                  <XAxis dataKey="name" tick={{ fill: C.textMuted, fontSize: 10 }} axisLine={false} tickLine={false} />
-                  <YAxis tick={{ fill: C.textMuted, fontSize: 9 }} axisLine={false} tickLine={false} />
-                  <Tooltip contentStyle={{ background: C.bgCard, border: `1px solid ${C.border}`, borderRadius: 8, fontSize: 11 }} formatter={(v) => fmtKg(v)} />
-                  <Bar dataKey="kg" fill={C.coffee} radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
+              {stationRows.every(r => r.kg === 0)
+                ? <div style={{ padding: "24px 0", textAlign: "center", color: C.textDim, fontSize: 12 }}>No data in selected range</div>
+                : <ResponsiveContainer width="100%" height={180}>
+                    <BarChart data={stationRows.map((r) => ({ name: r.cws.name.replace(" CWS", ""), "Cherry kg": r.kg }))} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke={C.border} vertical={false} />
+                      <XAxis dataKey="name" tick={{ fill: C.textMuted, fontSize: 10 }} axisLine={false} tickLine={false} />
+                      <YAxis tick={{ fill: C.textMuted, fontSize: 9 }} tickFormatter={(v) => v >= 1000 ? `${(v/1000).toFixed(0)}k` : v} axisLine={false} tickLine={false} width={32} />
+                      <Tooltip contentStyle={{ background: C.gradCard, border: `1px solid ${C.border}`, borderRadius: 12, fontSize: 11 }} formatter={(v) => [fmtKg(v), "Cherry kg"]} />
+                      <Bar dataKey="Cherry kg" fill={C.coffee} radius={[4, 4, 0, 0]} label={{ position: "top", fontSize: 9, fill: C.textMuted, formatter: (v) => v > 0 ? `${v}kg` : "" }} />
+                    </BarChart>
+                  </ResponsiveContainer>}
             </div>
-            <div style={{ background: C.bgCard, border: `1px solid ${C.border}`, borderRadius: 12, padding: "14px 16px 8px" }}>
+            <div style={{ background: C.gradCard, border: `1px solid ${C.border}`, borderRadius: 14, padding: "14px 16px 8px" }}>
               <div style={{ fontWeight: 700, fontSize: 12, marginBottom: 12 }}>Expenses by Category</div>
-              <ResponsiveContainer width="100%" height={160}>
-                <PieChart><Pie data={expByCat} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={60} label={({ name, percent }) => `${(percent * 100).toFixed(0)}%`} labelLine={false} style={{ fontSize: 9 }}>
-                  {expByCat.map((e, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
-                </Pie><Tooltip formatter={(v) => fmtRWF(v)} contentStyle={{ background: C.bgCard, border: `1px solid ${C.border}`, borderRadius: 8, fontSize: 11 }} /></PieChart>
-              </ResponsiveContainer>
+              {expByCat.length === 0
+                ? <div style={{ padding: "24px 0", textAlign: "center", color: C.textDim, fontSize: 12 }}>No approved expenses</div>
+                : <ResponsiveContainer width="100%" height={180}>
+                    <PieChart><Pie data={expByCat} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={65} label={({ name, percent }) => percent > 0.05 ? `${(percent * 100).toFixed(0)}%` : ""} labelLine={false} style={{ fontSize: 9 }}>
+                      {expByCat.map((e, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
+                    </Pie><Tooltip formatter={(v) => [fmtRWF(v), "Amount"]} contentStyle={{ background: C.gradCard, border: `1px solid ${C.border}`, borderRadius: 12, fontSize: 11 }} /></PieChart>
+                  </ResponsiveContainer>}
             </div>
           </div>
         </div>}
@@ -2584,13 +2693,13 @@ function ReportsPage() {
     /* ── FUND REQUESTS REPORT ───────────────────────────────── */
   }
       {reportType === "fund_requests" && <div>
-          <div style={{ className: "kpi-grid", style: { display: "grid" }, gap: 12, marginBottom: 14 }}>
-            <SC label="Total Requested" value={fmtRWF(fFR.reduce((s, f) => s + f.amount, 0))} color={C.warning} />
-            <SC label="Total Approved" value={fmtRWF(fFR.filter((f) => f.status === "approved").reduce((s, f) => s + f.amount, 0))} color={C.success} />
+          <div className="kpi-grid" style={{ display: "grid", gap: 12, marginBottom: 14  }}>
+            <SC label="Total Requested" value={fmtRWF(fFR.reduce((s, f) => s + (+f.amount || 0), 0))} color={C.warning} />
+            <SC label="Total Approved" value={fmtRWF(fFR.filter((f) => f.status === "approved").reduce((s, f) => s + (+f.amount || 0), 0))} color={C.success} />
             <SC label="Pending" value={fFR.filter((f) => f.status.includes("pending")).length} color={C.gold} />
             <SC label="Rejected" value={fFR.filter((f) => f.status === "rejected").length} color={C.danger} />
           </div>
-          <div style={{ background: C.bgCard, border: `1px solid ${C.border}`, borderRadius: 12, overflow: "hidden" }}>
+          <div style={{ background: C.gradCard, border: `1px solid ${C.border}`, borderRadius: 14, overflow: "hidden" }}>
             <div style={{ padding: "11px 16px", borderBottom: `1px solid ${C.border}`, fontWeight: 700, fontSize: 13, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <span>Fund Request Log ({fFR.length})</span>
               <button onClick={() => exportExcel("fund_requests")} style={{ ...BtnS(C.success, true), fontSize: 10, padding: "4px 10px" }}>⬇ CSV</button>
@@ -2608,7 +2717,7 @@ function ReportsPage() {
             <SC label="Total Balance" value={`${fStock.reduce((s, sk) => s + sk.tonnesBalance, 0).toFixed(2)} T`} color={C.gold} />
             <SC label="Total Value" value={fmtRWF(totalStock)} color={C.success} />
           </div>
-          <div style={{ background: C.bgCard, border: `1px solid ${C.border}`, borderRadius: 12, overflow: "hidden" }}>
+          <div style={{ background: C.gradCard, border: `1px solid ${C.border}`, borderRadius: 14, overflow: "hidden" }}>
             <div style={{ padding: "11px 16px", borderBottom: `1px solid ${C.border}`, fontWeight: 700, fontSize: 13 }}>Stock Movements</div>
             {fStock.length === 0 ? <ES text="No stock records for selected filters" /> : <div className="tbl-wrap"><table style={{ width: "100%", borderCollapse: "collapse" }}>
                 <thead><tr style={{ background: C.surface }}>{["Date", "Station", "Description", "Grade", "Tonnes In", "Balance", "Unit Cost", "Total Value", "Method"].map((h) => <Th key={h}>{h}</Th>)}</tr></thead>
@@ -2635,11 +2744,11 @@ function ReportsPage() {
   }
       {reportType === "debts" && <div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(130px,1fr))", gap: 12, marginBottom: 14 }}>
-            <SC label="Total Debt Given" value={fmtRWF(fDebts.filter((d) => d.type === "debt_given").reduce((s, d) => s + d.amount, 0))} color={C.danger} />
-            <SC label="Total Owed to CWS" value={fmtRWF(fDebts.filter((d) => d.type === "debt_to_others").reduce((s, d) => s + d.amount, 0))} color={C.warning} />
+            <SC label="Total Debt Given" value={fmtRWF(fDebts.filter((d) => d.type === "debt_given").reduce((s, d) => s + (+d.amount || 0), 0))} color={C.danger} />
+            <SC label="Total Owed to CWS" value={fmtRWF(fDebts.filter((d) => d.type === "debt_to_others").reduce((s, d) => s + (+d.amount || 0), 0))} color={C.warning} />
             <SC label="Total Outstanding" value={fmtRWF(totalDebts)} color={C.info} />
           </div>
-          <div style={{ background: C.bgCard, border: `1px solid ${C.border}`, borderRadius: 12, overflow: "hidden" }}>
+          <div style={{ background: C.gradCard, border: `1px solid ${C.border}`, borderRadius: 14, overflow: "hidden" }}>
             <div style={{ padding: "11px 16px", borderBottom: `1px solid ${C.border}`, fontWeight: 700, fontSize: 13 }}>Debt & Liability Register</div>
             {fDebts.length === 0 ? <ES text="No debt records for selected filters" /> : <div className="tbl-wrap"><table style={{ width: "100%", borderCollapse: "collapse" }}>
                 <thead><tr style={{ background: C.surface }}>{["Date", "Station", "Type", "Party", "Description", "Amount", "Balance", "Status"].map((h) => <Th key={h}>{h}</Th>)}</tr></thead>
@@ -2677,7 +2786,7 @@ function MachineryPage() {
   const TX_CATS = { income: ["Rental Income", "Operator Fee", "Transport Fee"], expense: ["Maintenance", "Fuel", "Insurance", "Spare Parts", "Labor"] };
   return <div>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 18 }}>
-        <div><div style={{ fontFamily: "'Cormorant',serif", fontSize: 24, fontWeight: 700, color: C.text }}>Bender Machine</div><div style={{ fontSize: 13, color: C.textMuted }}>Fleet · Tasks · Drivers</div></div>
+        <div><div style={{ fontFamily: "'Inter',sans-serif", fontSize: 22, letterSpacing: '-0.4px', fontWeight: 700, color: C.text }}>Bender Machine</div><div style={{ fontSize: 13, color: C.textMuted }}>Fleet · Tasks · Drivers</div></div>
         {canManage && <div style={{ display: "flex", gap: 8 }}>
           <button onClick={() => setShowAddDriver(true)} style={{ ...BtnS(C.machinery, true), fontSize: 11, padding: "7px 13px" }}>+ Driver</button>
           <button onClick={() => setShowAddMachine(true)} style={{ ...BtnS(C.machinery), fontSize: 11, padding: "7px 13px" }}>+ Machine</button>
@@ -2691,7 +2800,7 @@ function MachineryPage() {
     const activeTask = tasks.find((t) => t.machineId === m.id && t.status === "active");
     return <div key={m.id} style={{ background: `linear-gradient(145deg,${C.machineryBg},${C.bgCard})`, border: `1px solid ${C.machinery}35`, borderRadius: 13, padding: "18px", animation: `fadeUp .3s ease ${i * 0.08}s both` }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
-                <div><div style={{ fontFamily: "'Cormorant',serif", fontSize: 16, fontWeight: 700, color: C.machineryLight }}>{m.name}</div><div style={{ fontSize: 11, color: C.textMuted }}>{m.type} · {m.plate}</div></div>
+                <div><div style={{ fontFamily: "'Inter',sans-serif", fontSize: 14, fontWeight: 700, color: C.machineryLight }}>{m.name}</div><div style={{ fontSize: 11, color: C.textMuted }}>{m.type} · {m.plate}</div></div>
                 <SPill status={m.status} />
               </div>
               <div style={{ fontSize: 12, color: C.textMuted, marginBottom: 8 }}>🧑‍💼 <span style={{ color: C.text }}>{driver?.name || "No driver"}</span><br />🔧 <span style={{ color: C.text }}>{asst?.name || "No assistant"}</span></div>
@@ -2700,7 +2809,7 @@ function MachineryPage() {
             </div>;
   })}
         </div>}
-      {tab === "tasks" && <div style={{ background: C.bgCard, border: `1px solid ${C.border}`, borderRadius: 12, overflow: "hidden" }}>
+      {tab === "tasks" && <div style={{ background: C.gradCard, border: `1px solid ${C.border}`, borderRadius: 14, overflow: "hidden" }}>
           {tasks.length === 0 ? <ES text="No tasks assigned" /> : <div className="tbl-wrap"><table style={{ width: "100%", borderCollapse: "collapse" }}>
               <thead><tr style={{ background: C.surface }}>{["Machine", "Customer", "Location", "Start", "End", "Rate/hr", "Hours", "Status"].map((h) => <Th key={h}>{h}</Th>)}</tr></thead>
               <tbody>{tasks.map((t) => {
@@ -2718,7 +2827,7 @@ function MachineryPage() {
           <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 12 }}>
             {canManage && <button onClick={() => setShowAddTx(true)} style={{ ...BtnS(C.machinery), fontSize: 11, padding: "7px 13px" }}>+ Transaction</button>}
           </div>
-          <div style={{ background: C.bgCard, border: `1px solid ${C.border}`, borderRadius: 12, overflow: "hidden" }}>
+          <div style={{ background: C.gradCard, border: `1px solid ${C.border}`, borderRadius: 14, overflow: "hidden" }}>
             <div className="tbl-wrap"><table style={{ width: "100%", borderCollapse: "collapse" }}>
               <thead><tr style={{ background: C.surface }}>{["Date", "Machine", "Category", "Type", "Amount", "Description", "Status"].map((h) => <Th key={h}>{h}</Th>)}</tr></thead>
               <tbody>{machTx.map((t) => {
@@ -2733,7 +2842,7 @@ function MachineryPage() {
             </table></div>
           </div>
         </div>}
-      {tab === "driver_logs" && <div style={{ background: C.bgCard, border: `1px solid ${C.border}`, borderRadius: 12, overflow: "hidden" }}>
+      {tab === "driver_logs" && <div style={{ background: C.gradCard, border: `1px solid ${C.border}`, borderRadius: 14, overflow: "hidden" }}>
           {driverLogs.length === 0 ? <ES text="No driver logs" /> : <div className="tbl-wrap"><table style={{ width: "100%", borderCollapse: "collapse" }}>
               <thead><tr style={{ background: C.surface }}>{["Date", "Driver", "Machine", "Hours", "Fuel (L)", "Location", "Condition", "Status"].map((h) => <Th key={h}>{h}</Th>)}</tr></thead>
               <tbody>{driverLogs.map((l) => {
@@ -2747,7 +2856,7 @@ function MachineryPage() {
   })}</tbody>
             </table></div>}
         </div>}
-      {tab === "leaves" && <div style={{ background: C.bgCard, border: `1px solid ${C.border}`, borderRadius: 12, overflow: "hidden" }}>
+      {tab === "leaves" && <div style={{ background: C.gradCard, border: `1px solid ${C.border}`, borderRadius: 14, overflow: "hidden" }}>
           {leaves.length === 0 ? <ES text="No leave requests" /> : <div className="tbl-wrap"><table style={{ width: "100%", borderCollapse: "collapse" }}>
               <thead><tr style={{ background: C.surface }}>{["Date", "Driver", "Type", "Reason", "Status", "Action"].map((h) => <Th key={h}>{h}</Th>)}</tr></thead>
               <tbody>{leaves.map((lv) => {
@@ -2791,7 +2900,7 @@ function MachineryPage() {
 function ConstructionPage() {
   return <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: 300, gap: 14 }}>
       <div style={{ fontSize: 44 }}>🏛️</div>
-      <div style={{ fontFamily: "'Cormorant',serif", fontSize: 24, fontWeight: 700, color: C.constructionLight }}>Bender Construction</div>
+      <div style={{ fontFamily: "'Inter',sans-serif", fontSize: 22, letterSpacing: '-0.4px', fontWeight: 700, color: C.constructionLight }}>Bender Construction</div>
       <div style={{ fontSize: 13, color: C.textMuted, textAlign: "center", maxWidth: 420 }}>Construction project management module is coming soon. It will include project tracking, material costs, contractor management, and site reporting.</div>
       <span style={{ padding: "5px 14px", borderRadius: 20, background: `${C.construction}18`, border: `1px solid ${C.construction}30`, color: C.constructionLight, fontSize: 12 }}>Module in Development</span>
     </div>;
@@ -2806,16 +2915,16 @@ function DriverHome() {
   const [log, setLog] = useState({ date: today(), hours: "", fuelReceived: "", taskLocation: myTask ? `${myTask.district}, ${myTask.sector}` : "", condition: "good", comments: "" });
   const [leave, setLeave] = useState({ type: "off_day", date: "", reason: "" });
   return <div>
-      <div style={{ fontFamily: "'Cormorant',serif", fontSize: 24, fontWeight: 700, color: C.text, marginBottom: 18 }}>My Dashboard — <span style={{ color: C.machineryLight }}>{machine?.name || "No machine assigned"}</span></div>
-      {machine && <div style={{ background: C.bgCard, border: `1px solid ${C.machinery}28`, borderRadius: 13, padding: 18, marginBottom: 16, display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(180px,1fr))", gap: 14 }}>
-        <div><div style={{ fontSize: 10, color: C.textDim, textTransform: "uppercase", letterSpacing: "1px", marginBottom: 5 }}>My Machine</div><div style={{ fontFamily: "'Cormorant',serif", fontSize: 18, fontWeight: 700, color: C.machineryLight }}>{machine.name}</div><div style={{ fontSize: 11, color: C.textMuted }}>{machine.type} · {machine.plate}</div><SPill status={machine.status} /></div>
+      <div style={{ fontFamily: "'Inter',sans-serif", fontSize: 22, letterSpacing: '-0.4px', fontWeight: 700, color: C.text, marginBottom: 18 }}>My Dashboard — <span style={{ color: C.machineryLight }}>{machine?.name || "No machine assigned"}</span></div>
+      {machine && <div style={{ background: C.gradCard, border: `1px solid ${C.machinery}28`, borderRadius: 13, padding: 18, marginBottom: 16, display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(180px,1fr))", gap: 14 }}>
+        <div><div style={{ fontSize: 10, color: C.textDim, textTransform: "uppercase", letterSpacing: "1px", marginBottom: 5 }}>My Machine</div><div style={{ fontFamily: "'Inter',sans-serif", fontSize: 17, letterSpacing: '-0.2px', fontWeight: 700, color: C.machineryLight }}>{machine.name}</div><div style={{ fontSize: 11, color: C.textMuted }}>{machine.type} · {machine.plate}</div><SPill status={machine.status} /></div>
         {myTask && <div><div style={{ fontSize: 10, color: C.textDim, textTransform: "uppercase", letterSpacing: "1px", marginBottom: 5 }}>Active Task</div><div style={{ fontWeight: 700, fontSize: 13 }}>{myTask.customer}</div><div style={{ fontSize: 11, color: C.textMuted }}>{myTask.district}, {myTask.province}</div><div style={{ fontSize: 12, color: C.gold, marginTop: 4 }}>{fmtRWF(myTask.hourlyRate)}/hr</div></div>}
       </div>}
       <div style={{ display: "flex", gap: 10, marginBottom: 18 }}>
         <button onClick={() => setShowLog(true)} style={{ ...BtnS(C.machinery), padding: "8px 16px", fontSize: 12 }}>📋 Submit Daily Log</button>
         <button onClick={() => setShowLeave(true)} style={{ ...BtnS(C.machinery, true), padding: "8px 16px", fontSize: 12 }}>🗓️ Request Leave</button>
       </div>
-      <div style={{ background: C.bgCard, border: `1px solid ${C.border}`, borderRadius: 12, overflow: "hidden" }}>
+      <div style={{ background: C.gradCard, border: `1px solid ${C.border}`, borderRadius: 14, overflow: "hidden" }}>
         <div style={{ padding: "12px 18px", borderBottom: `1px solid ${C.border}`, fontWeight: 700, fontSize: 13 }}>My Recent Logs</div>
         {myLogs.length === 0 ? <ES text="No logs submitted yet" /> : <div className="tbl-wrap"><table style={{ width: "100%", borderCollapse: "collapse" }}>
             <thead><tr style={{ background: C.surface }}>{["Date", "Hours", "Fuel (L)", "Location", "Condition", "Status"].map((h) => <Th key={h}>{h}</Th>)}</tr></thead>
@@ -2843,20 +2952,28 @@ function UsersPage() {
   const canAccess = ["sudo", "md"].includes(cu.role);
   if (!canAccess) return <div style={{ padding: "60px 20px", textAlign: "center" }}>
     <div style={{ fontSize: 40, marginBottom: 16 }}>🔒</div>
-    <div style={{ fontFamily: "'Cormorant',serif", fontSize: 22, fontWeight: 700, color: C.danger, marginBottom: 8 }}>Access Restricted</div>
+    <div style={{ fontFamily: "'Inter',sans-serif", fontSize: 20, letterSpacing: '-0.3px', fontWeight: 700, color: C.danger, marginBottom: 8 }}>Access Restricted</div>
     <div style={{ fontSize: 13, color: C.textMuted }}>Only the Managing Director and Super Admin can view user accounts and credentials.</div>
   </div>;
   const [showAdd, setShowAdd] = useState(false);
+  const [editUser, setEditUser] = useState(null);
   const [tab, setTab] = useState("all");
   const [revealedPw, setRevealedPw] = useState({});
   const [form, setForm] = useState({ name: "", email: "", password: "", role: "cashier", cwsAccess: [], machineId: "" });
   const ROLE_OPTS = cu.role === "sudo" ? Object.keys(ROLES) : Object.keys(ROLES).filter((r) => r !== "sudo");
   const togglePw = (id) => setRevealedPw((p) => ({ ...p, [id]: !p[id] }));
   const submitCreate = () => {
-    if (!form.name || !form.email || !form.password) return;
-    setUsers((p) => [...p, { ...form, id: `u${Date.now()}`, avatar: form.name.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase(), createdAt: today(), active: true, cwsAccess: form.cwsAccess || [], machineId: form.machineId || null }]);
-    addNote(`User ${form.name} created`, "success");
+    if (!form.name || !form.email) return;
+    if (editUser) {
+      setUsers((p) => p.map((u) => u.id === editUser.id ? { ...u, ...form, avatar: form.name.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase(), cwsAccess: form.cwsAccess || [], machineId: form.machineId || null } : u));
+      addNote(`User ${form.name} updated`, "success");
+    } else {
+      if (!form.password) return;
+      setUsers((p) => [...p, { ...form, id: `u${Date.now()}`, avatar: form.name.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase(), createdAt: today(), active: true, cwsAccess: form.cwsAccess || [], machineId: form.machineId || null }]);
+      addNote(`User ${form.name} created`, "success");
+    }
     setShowAdd(false);
+    setEditUser(null);
     setForm({ name: "", email: "", password: "", role: "cashier", cwsAccess: [], machineId: "" });
   };
   const toggleActive = (id) => setUsers((p) => p.map((u) => u.id === id ? { ...u, active: !u.active } : u));
@@ -2864,7 +2981,7 @@ function UsersPage() {
   return <div>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14, flexWrap: "wrap", gap: 10 }}>
         <div>
-          <div style={{ fontFamily: "'Cormorant',serif", fontSize: 24, fontWeight: 700, color: C.text }}>User Management</div>
+          <div style={{ fontFamily: "'Inter',sans-serif", fontSize: 22, letterSpacing: '-0.4px', fontWeight: 700, color: C.text }}>User Management</div>
           <div style={{ fontSize: 13, color: C.textMuted }}>Roles · Access · Credentials</div>
         </div>
         <button onClick={() => setShowAdd(true)} style={{ ...BtnS(C.gold), padding: "8px 16px", fontSize: 12 }}>+ Create User</button>
@@ -2874,7 +2991,7 @@ function UsersPage() {
         <span>Credentials are only visible to <b>Super Admin</b> and <b>Managing Director</b>. Passwords are masked by default — click 👁 to reveal individually.</span>
       </div>
       <Tabs tabs={["all", "active", "inactive"]} active={tab} onChange={setTab} />
-      <div style={{ background: C.bgCard, border: `1px solid ${C.border}`, borderRadius: 12, overflow: "hidden" }}>
+      <div style={{ background: C.gradCard, border: `1px solid ${C.border}`, borderRadius: 14, overflow: "hidden" }}>
         <div className="tbl-wrap"><table style={{ width: "100%", borderCollapse: "collapse", minWidth: 720 }}>
           <thead><tr style={{ background: C.surface }}>{["User", "Role", "Email", "Password", "Station / Machine", "Created", "Status", ""].map((h) => <Th key={h}>{h}</Th>)}</tr></thead>
           <tbody>{filtered.map((usr) => <tr key={usr.id} style={{ borderBottom: `1px solid ${C.border}15` }} onMouseEnter={(e) => e.currentTarget.style.background = C.surface} onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}>
@@ -2887,14 +3004,14 @@ function UsersPage() {
                   <button onClick={() => togglePw(usr.id)} title={revealedPw[usr.id] ? "Hide" : "Reveal"} style={{ background: "transparent", border: `1px solid ${C.border}`, borderRadius: 5, cursor: "pointer", color: C.textMuted, fontSize: 12, padding: "3px 7px", lineHeight: 1 }}>{revealedPw[usr.id] ? "🙈" : "👁"}</button>
                 </div>
               </Td>
-              <Td style={{ color: C.textMuted, fontSize: 11 }}>{usr.cwsAccess?.length > 0 ? cwsList.filter((c) => usr.cwsAccess.includes(c.id)).map((c) => c.name).join(", ") : usr.machineId || "—"}</Td>
+              <Td style={{ color: C.textMuted, fontSize: 11 }}>{(usr.cwsAccess||[]).length > 0 ? cwsList.filter((c) => (usr.cwsAccess||[]).includes(c.id)).map((c) => c.name).join(", ") : usr.machineId || "—"}</Td>
               <Td style={{ color: C.textDim, fontSize: 11 }}>{usr.createdAt}</Td>
               <Td><SB status={usr.active ? "active" : "rejected"} /></Td>
-              <Td><button onClick={() => toggleActive(usr.id)} style={{ ...BtnS(usr.active ? C.danger : C.success, true), fontSize: 10, padding: "3px 9px" }}>{usr.active ? "Deactivate" : "Activate"}</button></Td>
+              <Td><div style={{ display: "flex", gap: 5 }}><button onClick={() => { setEditUser(usr); setForm({ name: usr.name, email: usr.email, password: usr.password || "", role: usr.role, cwsAccess: usr.cwsAccess || [], machineId: usr.machineId || "" }); setShowAdd(true); }} style={{ ...BtnS(C.info, true), fontSize: 10, padding: "3px 9px" }}>Edit</button><button onClick={() => toggleActive(usr.id)} style={{ ...BtnS(usr.active ? C.danger : C.success, true), fontSize: 10, padding: "3px 9px" }}>{usr.active ? "Deactivate" : "Activate"}</button></div></Td>
             </tr>)}</tbody>
         </table></div>
       </div>
-      {showAdd && <Modal title="Create New User" onClose={() => setShowAdd(false)}>
+      {showAdd && <Modal title={editUser ? "Edit User" : "Create New User"} onClose={() => { setShowAdd(false); setEditUser(null); setForm({ name: "", email: "", password: "", role: "cashier", cwsAccess: [], machineId: "" }); }}>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(180px,1fr))", gap: 11 }}>
             <FI label="Full Name" value={form.name} onChange={(v) => setForm((p) => ({ ...p, name: v }))} placeholder="Full name" />
             <FI label="Email" type="email" value={form.email} onChange={(v) => setForm((p) => ({ ...p, email: v }))} placeholder="user@bender.rw" />
@@ -2902,7 +3019,7 @@ function UsersPage() {
             <div><FL>Role</FL><select value={form.role} onChange={(e) => setForm((p) => ({ ...p, role: e.target.value }))} style={selS()}>{ROLE_OPTS.map((r) => <option key={r} value={r}>{ROLES[r]?.label || r}</option>)}</select></div>
             {["clerk", "cashier", "station_manager"].includes(form.role) && <div style={{ gridColumn: "1/-1" }}><FL>Assign Station</FL><select value={(form.cwsAccess || [])[0] || ""} onChange={(e) => setForm((p) => ({ ...p, cwsAccess: e.target.value ? [e.target.value] : [] }))} style={selS()}><option value="">— None —</option>{cwsList.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select></div>}
           </div>
-          <MF onCancel={() => setShowAdd(false)} onSave={submitCreate} label="Create User" color={C.gold} />
+          <MF onCancel={() => { setShowAdd(false); setEditUser(null); setForm({ name: "", email: "", password: "", role: "cashier", cwsAccess: [], machineId: "" }); }} onSave={submitCreate} label={editUser ? "Save Changes" : "Create User"} color={C.gold} />
         </Modal>}
     </div>;
 }
@@ -2912,7 +3029,7 @@ function SystemPage() {
   const [labels, setLabels] = useState({ ...system.labels });
   const [newCWS, setNewCWS] = useState({ name: "", region: "" });
   return <div>
-      <div style={{ fontFamily: "'Cormorant',serif", fontSize: 24, fontWeight: 700, color: C.text, marginBottom: 6 }}>System Configuration</div>
+      <div style={{ fontFamily: "'Inter',sans-serif", fontSize: 22, letterSpacing: '-0.4px', fontWeight: 700, color: C.text, marginBottom: 6 }}>System Configuration</div>
       <div style={{ fontSize: 13, color: C.textMuted, marginBottom: 18 }}>Super Admin settings — rename modules, manage stations, configure branding.</div>
       <Tabs tabs={["branding", "labels", "stations"]} labels={["Branding", "Module Labels", "Washing Stations"]} active={tab} onChange={setTab} />
       {tab === "branding" && <div style={{ maxWidth: 480 }}>
@@ -2931,7 +3048,7 @@ function SystemPage() {
         </div>}
       {tab === "stations" && <div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(130px,1fr))", gap: 12, marginBottom: 18 }}>
-            {cwsList.map((cws) => <div key={cws.id} style={{ background: C.bgCard, border: `1px solid ${C.coffee}28`, borderRadius: 11, padding: "14px 16px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            {cwsList.map((cws) => <div key={cws.id} style={{ background: C.gradCard, border: `1px solid ${C.coffee}28`, borderRadius: 11, padding: "14px 16px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <div><div style={{ fontWeight: 600, color: C.coffeeLight }}>{cws.name}</div><div style={{ fontSize: 11, color: C.textMuted }}>{cws.region}</div></div>
                 <button onClick={() => {
     setCwsList((p) => p.filter((c) => c.id !== cws.id));
@@ -2939,7 +3056,7 @@ function SystemPage() {
   }} style={{ ...BtnS(C.danger, false, true), fontSize: 10, padding: "3px 8px" }}>Remove</button>
               </div>)}
           </div>
-          <div style={{ background: C.bgCard, border: `1px solid ${C.border}`, borderRadius: 12, padding: "16px 18px", maxWidth: 400 }}>
+          <div style={{ background: C.gradCard, border: `1px solid ${C.border}`, borderRadius: 14, padding: "16px 18px", maxWidth: 400 }}>
             <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 12 }}>Add New Station</div>
             <div style={{ display: "grid", gap: 11 }}>
               <FI label="Station Name" value={newCWS.name} onChange={(v) => setNewCWS((p) => ({ ...p, name: v }))} placeholder="e.g. Rwamagana CWS" />
@@ -3046,75 +3163,125 @@ function FundTable({ rows, users, short, cwsList = [] }) {
   })}</tbody>
   </table></div>;
 }
+/* ── Avatar ── */
 function Ava({ user, size = 32 }) {
   const color = ROLES[user?.role]?.color || C.gold;
-  return <div style={{ width: size, height: size, borderRadius: "50%", background: `${color}20`, border: `1px solid ${color}32`, color, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontSize: size * 0.38, flexShrink: 0 }}>{user?.avatar || "?"}</div>;
+  return <div style={{ width: size, height: size, borderRadius: "50%", background: `linear-gradient(135deg,${color}30,${color}10)`, border: `1.5px solid ${color}40`, color, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontSize: size * 0.36, flexShrink: 0, boxShadow: `0 0 0 2px ${color}15` }}>{user?.avatar || "?"}</div>;
 }
+/* ── Role Badge ── */
 function RB({ role, sm }) {
   const r = ROLES[role];
   if (!r) return null;
-  return <span style={{ padding: sm ? "2px 6px" : "4px 10px", borderRadius: 4, fontSize: sm ? 9 : 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.3px", background: `${r.color}18`, color: r.light, border: `1px solid ${r.color}22`, whiteSpace: "nowrap" }}>{r.label}</span>;
+  return <span style={{ padding: sm ? "2px 8px" : "4px 12px", borderRadius: 20, fontSize: sm ? 9 : 11, fontWeight: 600, letterSpacing: "0.2px", background: `${r.color}18`, color: r.light, border: `1px solid ${r.color}28`, whiteSpace: "nowrap" }}>{r.label}</span>;
 }
+/* ── Status Badge ── */
 function SB({ status }) {
-  const cfg = { synced: { c: C.success, l: "Synced" }, pending: { c: C.warning, l: "Pending" }, offline: { c: C.danger, l: "Offline" }, submitted: { c: C.info, l: "Submitted" }, approved: { c: C.success, l: "Approved" }, rejected: { c: C.danger, l: "Rejected" }, active: { c: C.success, l: "Active" }, completed: { c: C.info, l: "Completed" }, given: { c: C.success, l: "Given" }, requested: { c: C.warning, l: "Requested" }, paid: { c: C.success, l: "Paid" }, not_paid: { c: C.danger, l: "Not Paid" }, outstanding: { c: C.danger, l: "Outstanding" }, partial: { c: C.warning, l: "Partial" }, pending_verification: { c: C.warning, l: "Pending Verification" }, pending_approval: { c: C.gold, l: "Pending Approval" } };
-  const d = cfg[status] || { c: C.textMuted, l: status };
-  return <span style={{ padding: "2px 7px", borderRadius: 4, fontSize: 10, fontWeight: 700, background: `${d.c}18`, color: d.c, border: `1px solid ${d.c}22`, whiteSpace: "nowrap" }}>{d.l}</span>;
+  const cfg = {
+    synced:              { c: C.success, l: "Synced",               icon: "●" },
+    pending:             { c: C.warning, l: "Pending",              icon: "◐" },
+    offline:             { c: C.danger,  l: "Offline",              icon: "○" },
+    submitted:           { c: C.info,    l: "Submitted",            icon: "↑" },
+    approved:            { c: C.success, l: "Approved",             icon: "✓" },
+    rejected:            { c: C.danger,  l: "Rejected",             icon: "✕" },
+    active:              { c: C.success, l: "Active",               icon: "●" },
+    completed:           { c: C.info,    l: "Completed",            icon: "✓" },
+    given:               { c: C.success, l: "Given",                icon: "↗" },
+    requested:           { c: C.warning, l: "Requested",            icon: "◐" },
+    paid:                { c: C.success, l: "Paid",                 icon: "✓" },
+    not_paid:            { c: C.danger,  l: "Not Paid",             icon: "✕" },
+    outstanding:         { c: C.danger,  l: "Outstanding",          icon: "!" },
+    partial:             { c: C.warning, l: "Partial",              icon: "◑" },
+    pending_verification:{ c: C.warning, l: "Pending Verification", icon: "◐" },
+    pending_approval:    { c: C.gold,    l: "Pending Approval",     icon: "◐" },
+  };
+  const d = cfg[status] || { c: C.textMuted, l: status, icon: "·" };
+  return <span style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "3px 9px", borderRadius: 20, fontSize: 10, fontWeight: 600, background: `${d.c}15`, color: d.c, border: `1px solid ${d.c}25`, whiteSpace: "nowrap" }}><span style={{ fontSize: 7, lineHeight: 1 }}>{d.icon}</span>{d.l}</span>;
 }
+/* ── Condition Badge ── */
 function CB({ cond }) {
   const cfg = { good: { c: C.success, l: "Good" }, fair: { c: C.warning, l: "Fair" }, needs_repair: { c: C.danger, l: "Needs Repair" }, critical: { c: C.dangerLight, l: "Critical" } };
   const d = cfg[cond] || { c: C.textMuted, l: cond };
-  return <span style={{ padding: "2px 7px", borderRadius: 4, fontSize: 10, fontWeight: 700, background: `${d.c}18`, color: d.c }}>{d.l}</span>;
+  return <span style={{ display: "inline-flex", padding: "3px 9px", borderRadius: 20, fontSize: 10, fontWeight: 600, background: `${d.c}15`, color: d.c, border: `1px solid ${d.c}25` }}>{d.l}</span>;
 }
+/* ── Status Pill ── */
 function SPill({ status }) {
   const cfg = { available: { c: C.success, l: "Available" }, on_task: { c: C.warning, l: "On Task" }, maintenance: { c: C.danger, l: "Maintenance" } };
   const d = cfg[status] || { c: C.textMuted, l: status };
-  return <span style={{ display: "inline-block", marginTop: 6, padding: "3px 9px", borderRadius: 20, fontSize: 10, fontWeight: 700, background: `${d.c}18`, color: d.c, border: `1px solid ${d.c}22` }}>{d.l}</span>;
+  return <span style={{ display: "inline-flex", marginTop: 6, padding: "4px 12px", borderRadius: 20, fontSize: 10, fontWeight: 600, background: `${d.c}15`, color: d.c, border: `1px solid ${d.c}25` }}>{d.l}</span>;
 }
-function SC({ label, value, color, sub }) {
-  return <div style={{ background: C.bgCard, border: `1px solid ${C.border}`, borderRadius: 12, padding: "14px 16px" }}><div style={{ fontSize: 9, color: C.textDim, textTransform: "uppercase", letterSpacing: "1px", marginBottom: 7 }}>{label}</div><div style={{ fontFamily: "'Cormorant',serif", fontSize: 18, fontWeight: 700, color, wordBreak: "break-word" }}>{value}</div>{sub && <div style={{ fontSize: 10, color: C.textMuted, marginTop: 2 }}>{sub}</div>}</div>;
+/* ── Stat Card ── */
+function SC({ label, value, color, sub, icon }) {
+  return <div style={{ background: C.gradCard, border: `1px solid ${C.border}`, borderRadius: 14, padding: "16px 18px", position: "relative", overflow: "hidden", transition: "border-color .2s,transform .2s,box-shadow .2s" }}
+    onMouseEnter={e => { e.currentTarget.style.borderColor = `${color}40`; e.currentTarget.style.transform = "translateY(-2px)"; e.currentTarget.style.boxShadow = `0 8px 24px rgba(0,0,0,.35)`; }}
+    onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.boxShadow = "none"; }}>
+    {icon && <div style={{ position: "absolute", top: 12, right: 14, fontSize: 22, opacity: .12 }}>{icon}</div>}
+    <div style={{ fontSize: 10, fontWeight: 600, color: C.textMuted, textTransform: "uppercase", letterSpacing: "0.8px", marginBottom: 8 }}>{label}</div>
+    <div style={{ fontSize: 22, fontWeight: 700, color, lineHeight: 1.1, wordBreak: "break-word", letterSpacing: "-0.5px" }}>{value}</div>
+    {sub && <div style={{ fontSize: 11, color: C.textDim, marginTop: 5, display: "flex", alignItems: "center", gap: 4 }}>{sub}</div>}
+    <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: 2, background: `linear-gradient(90deg,${color}50,transparent)`, borderRadius: "0 0 14px 14px" }} />
+  </div>;
 }
+/* ── Tabs ── */
 function Tabs({ tabs, labels, active, onChange, color = C.gold }) {
-  return <div style={{ display: "flex", gap: 3, background: C.bgCard, padding: 3, borderRadius: 9, width: "fit-content", marginBottom: 16, border: `1px solid ${C.border}`, flexWrap: "wrap" }}>{tabs.map((t, i) => <div key={t} onClick={() => onChange(t)} style={{ padding: "5px 12px", borderRadius: 7, cursor: "pointer", fontSize: 11, fontWeight: active === t ? 700 : 400, color: active === t ? color : C.textMuted, background: active === t ? `${color}18` : "transparent", transition: "all .15s", whiteSpace: "nowrap" }}>{labels?.[i] || t.replace(/_/g, " ")}</div>)}</div>;
+  return <div style={{ display: "flex", gap: 2, background: C.bgDeep, padding: 4, borderRadius: 12, width: "fit-content", marginBottom: 18, border: `1px solid ${C.border}`, flexWrap: "wrap" }}>
+    {tabs.map((t, i) => <div key={t} onClick={() => onChange(t)} style={{ padding: "6px 14px", borderRadius: 9, cursor: "pointer", fontSize: 12, fontWeight: active === t ? 600 : 400, color: active === t ? color : C.textMuted, background: active === t ? `${color}18` : "transparent", border: `1px solid ${active === t ? color+"28" : "transparent"}`, transition: "all .15s", whiteSpace: "nowrap" }}>{labels?.[i] || t.replace(/_/g, " ")}</div>)}
+  </div>;
 }
+/* ── Modal ── */
 function Modal({ title, onClose, children, wide }) {
-  return <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.72)", display: "flex", alignItems: "flex-end", justifyContent: "center", zIndex: 1e3, backdropFilter: "blur(6px)", padding: "0 8px 8px" }} onClick={onClose}><div style={{ background: C.bgCard, border: `1px solid ${C.border}`, borderRadius: 15, padding: 24, width: "100%", maxWidth: wide ? 640 : 490, maxHeight: "92vh", overflowY: "auto", animation: "fadeUp .2s ease both" }} onClick={(e) => e.stopPropagation()}><div style={{ fontFamily: "'Cormorant',serif", fontSize: 20, fontWeight: 700, color: C.text, marginBottom: 18 }}>{title}</div>{children}</div></div>;
+  return <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.75)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1e3, backdropFilter: "blur(8px)", padding: "16px" }} onClick={onClose}>
+    <div style={{ background: "linear-gradient(145deg,#161E17,#111714)", border: `1px solid ${C.borderLight}`, borderRadius: 18, padding: "26px 28px", width: "100%", maxWidth: wide ? 660 : 500, maxHeight: "90vh", overflowY: "auto", animation: "scaleIn .18s ease both", boxShadow: "0 24px 80px rgba(0,0,0,.6)" }} onClick={e => e.stopPropagation()}>
+      <div style={{ fontSize: 18, fontWeight: 700, color: C.text, marginBottom: 20, letterSpacing: "-0.3px" }}>{title}</div>
+      {children}
+    </div>
+  </div>;
 }
+/* ── Modal Footer ── */
 function MF({ onCancel, onSave, label, color }) {
-  return <div style={{ display: "flex", gap: 9, justifyContent: "flex-end", marginTop: 20, paddingTop: 14, borderTop: `1px solid ${C.border}` }}><button onClick={onCancel} style={{ padding: "7px 15px", background: "transparent", border: `1px solid ${C.border}`, borderRadius: 7, color: C.textMuted, fontSize: 12, cursor: "pointer" }}>Cancel</button><button onClick={onSave} style={{ ...BtnS(color || C.gold), padding: "7px 16px", fontSize: 12 }}>{label || "Save"}</button></div>;
+  return <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 22, paddingTop: 16, borderTop: `1px solid ${C.border}` }}>
+    <button onClick={onCancel} style={{ padding: "8px 18px", background: "transparent", border: `1px solid ${C.border}`, borderRadius: 9, color: C.textMuted, fontSize: 13, cursor: "pointer", fontWeight: 500, transition: "all .15s" }} onMouseEnter={e => e.target.style.borderColor = C.borderLight} onMouseLeave={e => e.target.style.borderColor = C.border}>Cancel</button>
+    <button onClick={onSave} style={{ ...BtnS(color || C.gold), padding: "8px 20px", fontSize: 13 }}>{label || "Save"}</button>
+  </div>;
 }
+/* ── Form Label ── */
 function FL({ children }) {
-  return <div style={{ fontSize: 9, fontWeight: 700, color: C.textDim, textTransform: "uppercase", letterSpacing: "1px", marginBottom: 5 }}>{children}</div>;
+  return <div style={{ fontSize: 10, fontWeight: 600, color: C.textMuted, textTransform: "uppercase", letterSpacing: "0.7px", marginBottom: 6 }}>{children}</div>;
 }
+/* ── Form Input ── */
 function FI({ label, type = "text", value, onChange, placeholder, onEnter }) {
-  return <div>{label && <FL>{label}</FL>}<input type={type} value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} onKeyDown={(e) => e.key === "Enter" && onEnter && onEnter()} style={{ width: "100%", padding: "9px 12px", background: C.bg, border: `1.5px solid ${C.border}`, borderRadius: 8, color: C.text, fontSize: 13, outline: "none", transition: "border-color .15s" }} onFocus={(e) => e.target.style.borderColor = C.gold} onBlur={(e) => e.target.style.borderColor = C.border} /></div>;
+  return <div>
+    {label && <FL>{label}</FL>}
+    <input type={type} value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder}
+      onKeyDown={e => e.key === "Enter" && onEnter && onEnter()}
+      style={{ width: "100%", padding: "10px 13px", background: C.bgDeep, border: `1.5px solid ${C.border}`, borderRadius: 10, color: C.text, fontSize: 13, outline: "none", transition: "border-color .15s, box-shadow .15s" }}
+      onFocus={e => { e.target.style.borderColor = C.gold; e.target.style.boxShadow = `0 0 0 3px ${C.gold}15`; }}
+      onBlur={e => { e.target.style.borderColor = C.border; e.target.style.boxShadow = "none"; }} />
+  </div>;
 }
+/* ── Alert Banner ── */
 function Alert({ text, color }) {
-  return <div style={{ padding: "8px 12px", background: `${color}12`, border: `1px solid ${color}28`, borderRadius: 7, fontSize: 12, color }}>{text}</div>;
+  return <div style={{ padding: "10px 14px", background: `${color}10`, border: `1px solid ${color}25`, borderRadius: 10, fontSize: 12, color, display: "flex", alignItems: "flex-start", gap: 8, lineHeight: 1.5 }}>{text}</div>;
 }
+/* ── Empty State ── */
 function ES({ text }) {
-  return <div style={{ padding: "32px 20px", textAlign: "center", color: C.textDim, fontSize: 13 }}>{text}</div>;
+  return <div style={{ padding: "40px 24px", textAlign: "center", color: C.textDim, fontSize: 13 }}>
+    <div style={{ fontSize: 28, marginBottom: 10, opacity: .4 }}>◎</div>
+    {text}
+  </div>;
 }
+/* ── Table Header Cell ── */
 function Th({ children }) {
-  return <th style={{ padding: "8px 10px", textAlign: "left", fontSize: 10, fontWeight: 700, color: C.textDim, textTransform: "uppercase", letterSpacing: "1px", borderBottom: `1px solid ${C.border}`, whiteSpace: "nowrap" }}>{children}</th>;
+  return <th style={{ padding: "10px 12px", textAlign: "left", fontSize: 10, fontWeight: 600, color: C.textMuted, textTransform: "uppercase", letterSpacing: "0.8px", borderBottom: `1px solid ${C.border}`, whiteSpace: "nowrap", background: C.bgDeep }}>{children}</th>;
 }
+/* ── Table Data Cell ── */
 function Td({ children, style }) {
-  return <td style={{ padding: "9px 10px", fontSize: 12, ...style }}>{children}</td>;
+  return <td style={{ padding: "10px 12px", fontSize: 12.5, borderBottom: `1px solid ${C.border}08`, ...style }}>{children}</td>;
 }
 
-// ── Mount ───────────────────────────────────────────────────────────
-// Babel compiles this entire file in one pass, so App is guaranteed
-// to be defined here. We mount directly instead of exporting to window.
-(function () {
-  const root = document.getElementById('root');
-  if (!root) return;
+(function(){
+  var root=document.getElementById("root");
+  if(!root)return;
   ReactDOM.createRoot(root).render(React.createElement(App));
-  // Dismiss splash screen (guard against double removal)
-  const splash = document.getElementById('splash');
-  if (splash && !splash.__removing) {
-    splash.__removing = true;
-    setTimeout(() => {
-      splash.classList.add('hide');
-      setTimeout(() => { if (splash.parentNode) splash.parentNode.removeChild(splash); }, 400);
-    }, 800);
-  }
+  var splash=document.getElementById("splash");
+  if(splash&&!splash.__rm){splash.__rm=true;setTimeout(function(){splash.classList.add("hide");setTimeout(function(){if(splash.parentNode)splash.parentNode.removeChild(splash);},400);},800);}
 })();
