@@ -583,12 +583,20 @@ function App() {
   }, []);
   const addNote = (text, type = "info") => setNotifications((p) => [{ id: Date.now(), text, type, read: false, time: (/* @__PURE__ */ new Date()).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) }, ...p]);
   const login = async (email, password) => {
+    console.log("[Bender Login] Attempting:", email);
+
     // Step 1: ALWAYS check INIT_USERS and loaded users first
-    // This guarantees demo/seed accounts always work, even before server responds
-    const localMatch =
-      INIT_USERS.find(x => x.email === email && x.password === password && x.active) ||
-      users.find(x => x.email === email && x.password === password && x.active);
-    if (localMatch) return localMatch;
+    const initMatch = INIT_USERS.find(x => x.email === email && x.password === password && x.active);
+    console.log("[Bender Login] INIT_USERS match:", initMatch ? "FOUND ✓" : "not found");
+
+    const stateMatch = users.find(x => x.email === email && x.password === password && x.active);
+    console.log("[Bender Login] users state match:", stateMatch ? "FOUND ✓" : "not found", "| users loaded:", users.length);
+
+    const localMatch = initMatch || stateMatch;
+    if (localMatch) {
+      console.log("[Bender Login] Logged in locally as:", localMatch.name, localMatch.role);
+      return localMatch;
+    }
 
     // Step 2: Try Supabase via Express proxy (for real accounts created later)
     try {
