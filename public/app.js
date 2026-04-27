@@ -667,7 +667,22 @@ function App() {
               headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
               body: JSON.stringify({ users: INIT_USERS }),
             }).then(r => r.json()).then(d => {
-              if (d.ok) console.log("[Bender] Profiles seeded to Supabase:", d.results?.length);
+              if (d.ok) {
+                console.log("[Bender] Profiles seeded to Supabase:", d.results?.length);
+                // Flush any queued user sync operations
+                const queue = JSON.parse(localStorage.getItem("user_sync_queue") || "[]");
+                if (queue.length > 0) {
+                  localStorage.removeItem("user_sync_queue");
+                  queue.forEach(({ method, userData }) => {
+                    fetch(method === "PUT" ? `/api/users/${encodeURIComponent(userData.supabaseId || userData.id)}` : "/api/users", {
+                      method,
+                      headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+                      body: JSON.stringify({ name: userData.name, role: userData.role, email: userData.email, cwsAccess: userData.cwsAccess || [], machineId: userData.machineId || null, avatar: userData.avatar, active: userData.active, password: userData.password }),
+                    }).catch(() => {});
+                  });
+                  console.log("[Bender] Flushed", queue.length, "queued user changes");
+                }
+              }
             }).catch(() => {});
           }
         } catch (_) {}
@@ -3051,30 +3066,91 @@ function UsersPage() {
   const [form, setForm] = useState({ name: "", email: "", password: "", role: "cashier", cwsAccess: [], machineId: "" });
   const ROLE_OPTS = cu.role === "sudo" ? Object.keys(ROLES) : Object.keys(ROLES).filter((r) => r !== "sudo");
   const togglePw = (id) => setRevealedPw((p) => ({ ...p, [id]: !p[id] }));
+  // Push user change to Supabase via server
+  // Uses /api/users/:id (PATCH profiles) for existing users
+  // Uses /api/users (POST — creates Supabase Auth + profile) for new users
   const syncUserToServer = async (method, userData) => {
     try {
       const token = localStorage.getItem("bender_token");
-      if (!token) return;
-      const url = method === "PUT" ? `/api/users/${userData.id}` : "/api/users";
-      await fetch(url, {
-        method,
-        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
-        body: JSON.stringify(userData)
-      });
-    } catch (_) { /* silent — local save already done */ }
+      if (!token) {
+        // No Supabase token — queue the change for when user logs in via Supabase
+        const queue = JSON.parse(localStorage.getItem("user_sync_queue") || "[]");
+        queue.push({ method, userData, ts: Date.now() });
+        localStorage.setItem("user_sync_queue", JSON.stringify(queue));
+        return;
+      }
+
+      // For PUT: use supabaseId if available, fall back to email lookup
+      if (method === "PUT") {
+        // userData.supabaseId is set when user was created via Supabase
+        // For seed users, server looks them up by email
+        const res = await fetch(`/api/users/${encodeURIComponent(userData.supabaseId || userData.id)}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+          body: JSON.stringify({
+            name:       userData.name,
+            role:       userData.role,
+            cwsAccess:  userData.cwsAccess || [],
+            machineId:  userData.machineId || null,
+            avatar:     userData.avatar,
+            active:     userData.active,
+            email:      userData.email,   // server uses this for seed user lookup
+          })
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          console.warn("[Bender] User update failed:", err.error);
+        }
+      } else {
+        // POST — create new user in Supabase Auth + profiles
+        const res = await fetch("/api/users", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+          body: JSON.stringify({
+            name:       userData.name,
+            email:      userData.email,
+            password:   userData.password || "changeme123",
+            role:       userData.role,
+            cwsAccess:  userData.cwsAccess || [],
+            machineId:  userData.machineId || null,
+            avatar:     userData.avatar,
+          })
+        });
+        if (res.ok) {
+          const d = await res.json();
+          // Store the Supabase UUID so future PUTs use the right id
+          if (d.id) setUsers(p => p.map(u => u.id === userData.id ? { ...u, supabaseId: d.id } : u));
+        }
+      }
+    } catch (e) {
+      console.warn("[Bender] syncUserToServer error:", e.message);
+    }
   };
 
   const submitCreate = () => {
     if (!form.name || !form.email) return;
     if (editUser) {
-      const updated = { ...editUser, ...form, avatar: form.name.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase(), cwsAccess: form.cwsAccess || [], machineId: form.machineId || null };
-      setUsers((p) => p.map((u) => u.id === editUser.id ? updated : u));
+      const updated = {
+        ...editUser, ...form,
+        avatar:     form.name.split(" ").map(w => w[0]).join("").slice(0,2).toUpperCase(),
+        cwsAccess:  form.cwsAccess || [],
+        machineId:  form.machineId || null,
+      };
+      setUsers(p => p.map(u => u.id === editUser.id ? updated : u));
       syncUserToServer("PUT", updated);
       addNote(`User ${form.name} updated`, "success");
     } else {
       if (!form.password) return;
-      const created = { ...form, id: `u${Date.now()}`, avatar: form.name.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase(), createdAt: today(), active: true, cwsAccess: form.cwsAccess || [], machineId: form.machineId || null };
-      setUsers((p) => [...p, created]);
+      const created = {
+        ...form,
+        id:         `u${Date.now()}`,
+        avatar:     form.name.split(" ").map(w => w[0]).join("").slice(0,2).toUpperCase(),
+        createdAt:  today(),
+        active:     true,
+        cwsAccess:  form.cwsAccess || [],
+        machineId:  form.machineId || null,
+      };
+      setUsers(p => [...p, created]);
       syncUserToServer("POST", created);
       addNote(`User ${form.name} created`, "success");
     }
@@ -3084,10 +3160,10 @@ function UsersPage() {
   };
 
   const toggleActive = (id) => {
-    const updated = users.find(u => u.id === id);
-    if (!updated) return;
-    const toggled = { ...updated, active: !updated.active };
-    setUsers((p) => p.map((u) => u.id === id ? toggled : u));
+    const user = users.find(u => u.id === id);
+    if (!user) return;
+    const toggled = { ...user, active: !user.active };
+    setUsers(p => p.map(u => u.id === id ? toggled : u));
     syncUserToServer("PUT", toggled);
   };
   const filtered = tab === "all" ? users : tab === "inactive" ? users.filter((x) => !x.active) : users.filter((x) => x.active);
