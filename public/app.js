@@ -556,6 +556,28 @@ function App() {
         console.error("DB init error", e);
       }
       setDbReady(true);
+
+      // Pull latest users from server in background (picks up changes made on other devices)
+      try {
+        const token = localStorage.getItem("bender_token");
+        if (token) {
+          const res = await fetch("/api/users", {
+            headers: { "Authorization": `Bearer ${token}` }
+          });
+          if (res.ok) {
+            const serverUsers = await res.json();
+            if (Array.isArray(serverUsers) && serverUsers.length > 0) {
+              // Merge: keep passwords from INIT_USERS, use server data for everything else
+              const merged = serverUsers.map(u => {
+                const init = INIT_USERS.find(x => x.email === u.email);
+                return { ...u, cwsAccess: u.cwsAccess || u.cws_access || [], password: u.password || (init ? init.password : "") };
+              });
+              setUsersRaw(merged);
+              await DB.save("users", merged);
+            }
+          }
+        }
+      } catch (_) { /* server unreachable — use local data */ }
     }
     init();
   }, []);
@@ -633,7 +655,24 @@ function App() {
     </div>;
   if (!currentUser) return <Ctx.Provider value={ctx}><style>{GS}</style><LoginPage onLogin={async (e, p) => {
     const u = await login(e, p);
-    if (u) setCurrentUser(u);
+    if (u) {
+      setCurrentUser(u);
+      // If sudo, push INIT_USERS to Supabase profiles once (idempotent)
+      if (u.role === "sudo") {
+        try {
+          const token = localStorage.getItem("bender_token");
+          if (token) {
+            fetch("/api/seed-profiles", {
+              method: "POST",
+              headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+              body: JSON.stringify({ users: INIT_USERS }),
+            }).then(r => r.json()).then(d => {
+              if (d.ok) console.log("[Bender] Profiles seeded to Supabase:", d.results?.length);
+            }).catch(() => {});
+          }
+        } catch (_) {}
+      }
+    }
     return !!u;
   }} system={system} /></Ctx.Provider>;
   return <Ctx.Provider value={ctx}><style>{GS}</style><Shell onLogout={() => {
@@ -3012,21 +3051,45 @@ function UsersPage() {
   const [form, setForm] = useState({ name: "", email: "", password: "", role: "cashier", cwsAccess: [], machineId: "" });
   const ROLE_OPTS = cu.role === "sudo" ? Object.keys(ROLES) : Object.keys(ROLES).filter((r) => r !== "sudo");
   const togglePw = (id) => setRevealedPw((p) => ({ ...p, [id]: !p[id] }));
+  const syncUserToServer = async (method, userData) => {
+    try {
+      const token = localStorage.getItem("bender_token");
+      if (!token) return;
+      const url = method === "PUT" ? `/api/users/${userData.id}` : "/api/users";
+      await fetch(url, {
+        method,
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+        body: JSON.stringify(userData)
+      });
+    } catch (_) { /* silent — local save already done */ }
+  };
+
   const submitCreate = () => {
     if (!form.name || !form.email) return;
     if (editUser) {
-      setUsers((p) => p.map((u) => u.id === editUser.id ? { ...u, ...form, avatar: form.name.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase(), cwsAccess: form.cwsAccess || [], machineId: form.machineId || null } : u));
+      const updated = { ...editUser, ...form, avatar: form.name.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase(), cwsAccess: form.cwsAccess || [], machineId: form.machineId || null };
+      setUsers((p) => p.map((u) => u.id === editUser.id ? updated : u));
+      syncUserToServer("PUT", updated);
       addNote(`User ${form.name} updated`, "success");
     } else {
       if (!form.password) return;
-      setUsers((p) => [...p, { ...form, id: `u${Date.now()}`, avatar: form.name.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase(), createdAt: today(), active: true, cwsAccess: form.cwsAccess || [], machineId: form.machineId || null }]);
+      const created = { ...form, id: `u${Date.now()}`, avatar: form.name.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase(), createdAt: today(), active: true, cwsAccess: form.cwsAccess || [], machineId: form.machineId || null };
+      setUsers((p) => [...p, created]);
+      syncUserToServer("POST", created);
       addNote(`User ${form.name} created`, "success");
     }
     setShowAdd(false);
     setEditUser(null);
     setForm({ name: "", email: "", password: "", role: "cashier", cwsAccess: [], machineId: "" });
   };
-  const toggleActive = (id) => setUsers((p) => p.map((u) => u.id === id ? { ...u, active: !u.active } : u));
+
+  const toggleActive = (id) => {
+    const updated = users.find(u => u.id === id);
+    if (!updated) return;
+    const toggled = { ...updated, active: !updated.active };
+    setUsers((p) => p.map((u) => u.id === id ? toggled : u));
+    syncUserToServer("PUT", toggled);
+  };
   const filtered = tab === "all" ? users : tab === "inactive" ? users.filter((x) => !x.active) : users.filter((x) => x.active);
   return <div>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14, flexWrap: "wrap", gap: 10 }}>
