@@ -40,7 +40,7 @@ if (!SUPABASE_URL || !SUPABASE_KEY) {
 // The service-role key bypasses Row Level Security for server-side ops.
 
 async function sbFetch(path, opts = {}) {
-  const url = `${SUPABASE_URL}/rest/v1${path}`;
+  const url = `${SUPABASE_URL}/rest/v1/${path.replace(/^\/+/, "")}`;
   const res  = await fetch(url, {
     ...opts,
     headers: {
