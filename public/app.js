@@ -340,7 +340,33 @@ const apiFetch = async (path, opts = {}) => {
     }
   });
   if (res.status === 401) {
+    // Try to refresh the token before giving up
+    const refresh = localStorage.getItem("bender_refresh");
+    if (refresh) {
+      try {
+        const rfRes = await fetch("/api/auth/refresh", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ refresh_token: refresh }),
+        });
+        if (rfRes.ok) {
+          const rfData = await rfRes.json();
+          localStorage.setItem("bender_token", rfData.token);
+          if (rfData.refresh_token) localStorage.setItem("bender_refresh", rfData.refresh_token);
+          // Retry original request with new token
+          return fetch(path, {
+            ...opts,
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": `Bearer ${rfData.token}`,
+              ...(opts.headers || {}),
+            },
+          });
+        }
+      } catch (_) {}
+    }
     localStorage.removeItem("bender_token");
+    localStorage.removeItem("bender_refresh");
     window.location.reload();
   }
   return res;
@@ -441,18 +467,69 @@ function App() {
   const [pending, setPendingRaw] = useState(INIT_PENDING);
   const [system, setSystemRaw] = useState(INIT_SYSTEM);
   const [currentUser, setCurrentUser] = useState(null);
-  const [online, setOnline] = useState(true);
+  const [online, setOnline] = useState(typeof window.__benderOnline !== 'undefined' ? window.__benderOnline : navigator.onLine);
   const [notifications, setNotifications] = useState([
     { id: "n1", text: "Fund request from Nyungwe CWS awaiting verification", type: "fund", read: false, time: "08:30" },
     { id: "n2", text: "Fund request from Nyarubaka CWS awaiting verification", type: "fund", read: false, time: "08:45" },
     { id: "n3", text: "Warehouse shipment from Nyungwe awaiting confirmation", type: "warehouse", read: false, time: "09:00" }
   ]);
   const [page, setPage] = useState({ view: "home", sub: null });
+  // Table name mapping: localStorage key → server API table name
+  const TABLE_MAP = {
+    bank:      "bank_transactions",
+    warehouse: "warehouse_stock",
+    cws:       "cws",
+    farmers:   "farmers",
+    cherry:    "cherry",
+    cashbook:  "cashbook",
+    expenses:  "expenses",
+    debts:     "debts",
+    stock:     "stock",
+    fund_requests: "fund_requests",
+    projects:  "projects",
+    project_costs: "project_costs",
+    milestones:"milestones",
+    contractors:"contractors",
+    machines:  "machines",
+    assistants:"assistants",
+    tasks:     "tasks",
+    mach_tx:   "mach_tx",
+    driver_logs:"driver_logs",
+    leaves:    "leaves",
+    seasons:   "seasons",
+    station_seasons:"station_seasons",
+    users:     "users",
+    system:    "system",
+  };
+
+  // Sync a list of records to Supabase via /api/sync
+  const syncToServer = async (table, records) => {
+    try {
+      const token = localStorage.getItem("bender_token");
+      if (!token) return; // not logged in via Supabase yet — localStorage only
+      const serverTable = TABLE_MAP[table] || table;
+      if (serverTable === "users" || serverTable === "system") return; // handled separately
+      const ops = (Array.isArray(records) ? records : [records]).map(r => ({
+        table:  serverTable,
+        method: "POST", // upsert
+        id:     r.id,
+        data:   r,
+      }));
+      await apiFetch("/api/sync", {
+        method: "POST",
+        body: JSON.stringify({ operations: ops }),
+      });
+    } catch (e) {
+      console.warn("[Bender] syncToServer failed:", e.message);
+    }
+  };
+
   const mkSet = (raw, table) => (val) => {
     const next = typeof val === "function" ? val : () => val;
     raw((prev) => {
       const newVal = next(prev);
-      DB.save(table, newVal);
+      DB.save(table, newVal); // always keep localStorage as offline cache
+      syncToServer(table, newVal); // also push to Supabase
       return newVal;
     });
   };
@@ -557,23 +634,73 @@ function App() {
       }
       setDbReady(true);
 
-      // Pull latest users from server in background (picks up changes made on other devices)
+      // Pull latest data from server in background
+      // This syncs any changes made on other devices
       try {
         const token = localStorage.getItem("bender_token");
         if (token) {
-          const res = await fetch("/api/users", {
-            headers: { "Authorization": `Bearer ${token}` }
-          });
+          const lastSync = localStorage.getItem("last_sync") || "1970-01-01T00:00:00Z";
+          const res = await apiFetch(`/api/pull?since=${encodeURIComponent(lastSync)}`);
           if (res.ok) {
-            const serverUsers = await res.json();
+            const { delta } = await res.json();
+            if (delta) {
+              // Update each table that has new data from server
+              const setters = {
+                cherry:           setCherryRaw,
+                cashbook:         setCashbookRaw,
+                bank_transactions:setBankTxRaw,
+                expenses:         setExpensesRaw,
+                debts:            setDebtsRaw,
+                stock:            setStockRaw,
+                fund_requests:    setFundRequestsRaw,
+                warehouse_stock:  setWarehouseStockRaw,
+                projects:         setProjectsRaw,
+                project_costs:    setProjectCostsRaw,
+                milestones:       setSeasonsRaw,
+                contractors:      setContractorsRaw,
+                machines:         setMachinesRaw,
+                assistants:       setAssistantsRaw,
+                tasks:            setTasksRaw,
+                mach_tx:          setMachTxRaw,
+                driver_logs:      setDriverLogsRaw,
+                leaves:           setLeavesRaw,
+                seasons:          setSeasonsRaw,
+                station_seasons:  setStationSeasonsRaw,
+                farmers:          setFarmersRaw,
+                cws:              setCwsListRaw,
+              };
+              for (const [table, rows] of Object.entries(delta)) {
+                if (!rows || !rows.length) continue;
+                const setter = setters[table];
+                if (setter) {
+                  setter(prev => {
+                    // Merge: server rows override local rows with same id
+                    const map = Object.fromEntries((prev||[]).map(r => [r.id, r]));
+                    rows.forEach(r => { map[r.id] = { ...map[r.id], ...r }; });
+                    const merged = Object.values(map);
+                    DB.save(table === "bank_transactions" ? "bank" : table === "warehouse_stock" ? "warehouse" : table, merged);
+                    return merged;
+                  });
+                }
+              }
+              localStorage.setItem("last_sync", new Date().toISOString());
+            }
+          }
+          // Pull users separately
+          const usersRes = await apiFetch("/api/users");
+          if (usersRes.ok) {
+            const serverUsers = await usersRes.json();
             if (Array.isArray(serverUsers) && serverUsers.length > 0) {
-              // Merge: keep passwords from INIT_USERS, use server data for everything else
               const merged = serverUsers.map(u => {
-                const init = INIT_USERS.find(x => x.email === u.email);
-                return { ...u, cwsAccess: u.cwsAccess || u.cws_access || [], password: u.password || (init ? init.password : "") };
+                const init = INIT_USERS.find(x => x.email === (u.email || ""));
+                return {
+                  ...u,
+                  cwsAccess: u.cwsAccess || u.cws_access || [],
+                  password:  u.password  || (init ? init.password : ""),
+                };
               });
               setUsersRaw(merged);
-              await DB.save("users", merged);
+              DB.save("users", merged);
             }
           }
         }
@@ -581,77 +708,91 @@ function App() {
     }
     init();
   }, []);
+
+  // Supabase Realtime — receive live changes from other devices
+  useEffect(() => {
+    if (!window.__supabase) return;
+    const channel = window.__supabase
+      .channel("bender-live")
+      .on("postgres_changes", { event: "*", schema: "public" }, () => {
+        const token = localStorage.getItem("bender_token");
+        if (!token) return;
+        const since = localStorage.getItem("last_sync") || "1970-01-01T00:00:00Z";
+        apiFetch(`/api/pull?since=${encodeURIComponent(since)}`)
+          .then(r => r.ok ? r.json() : null)
+          .then(d => {
+            if (!d?.delta) return;
+            localStorage.setItem("last_sync", new Date().toISOString());
+            if (d.delta.cherry?.length) setCherryRaw(p => {
+              const m = Object.fromEntries((p||[]).map(r=>[r.id,r]));
+              d.delta.cherry.forEach(r=>{m[r.id]={...m[r.id],...r};});
+              return Object.values(m);
+            });
+            if (d.delta.fund_requests?.length) setFundRequestsRaw(p => {
+              const m = Object.fromEntries((p||[]).map(r=>[r.id,r]));
+              d.delta.fund_requests.forEach(r=>{m[r.id]={...m[r.id],...r};});
+              return Object.values(m);
+            });
+          }).catch(()=>{});
+      }).subscribe();
+    return () => { try { window.__supabase.removeChannel(channel); } catch(_){} };
+  }, []);
   const addNote = (text, type = "info") => setNotifications((p) => [{ id: Date.now(), text, type, read: false, time: (/* @__PURE__ */ new Date()).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) }, ...p]);
   const login = async (email, password) => {
-    console.log("[Bender Login] Attempting:", email);
-
-    // Step 1: ALWAYS check INIT_USERS and loaded users first
-    const initMatch = INIT_USERS.find(x => x.email === email && x.password === password && x.active);
-    console.log("[Bender Login] INIT_USERS match:", initMatch ? "FOUND ✓" : "not found");
-
-    const stateMatch = users.find(x => x.email === email && x.password === password && x.active);
-    console.log("[Bender Login] users state match:", stateMatch ? "FOUND ✓" : "not found", "| users loaded:", users.length);
-
-    const localMatch = initMatch || stateMatch;
-    if (localMatch) {
-      console.log("[Bender Login] Logged in locally as:", localMatch.name, localMatch.role);
-      return localMatch;
-    }
-
-    // Step 2: Try Supabase via Express proxy (for real accounts created later)
+    // ── Step 1: Try Supabase Auth via server (primary path) ──────────
     try {
       const res = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password })
+        body: JSON.stringify({ email, password }),
       });
       const data = await res.json();
-      if (!res.ok) return null;
 
-      localStorage.setItem("bender_token", data.token);
-      window.dispatchEvent(new CustomEvent("bender:token", { detail: data.token }));
+      if (res.ok && data.token) {
+        // Store token — all subsequent API calls use this
+        localStorage.setItem("bender_token", data.token);
+        if (data.refresh_token) localStorage.setItem("bender_refresh", data.refresh_token);
+        window.dispatchEvent(new CustomEvent("bender:token", { detail: data.token }));
 
-      // Try to get full profile with role/cwsAccess
-      let u = users.find(x => x.email === email && x.active);
-
-      if (!u) {
+        // Fetch full profile to get role/cwsAccess from profiles table
+        let profile = data.user || {};
         try {
-          const profRes = await fetch("/api/auth/me", {
-            headers: { "Authorization": `Bearer ${data.token}` }
+          const meRes = await fetch("/api/auth/me", {
+            headers: { "Authorization": `Bearer ${data.token}`, "Content-Type": "application/json" }
           });
-          if (profRes.ok) {
-            const prof = await profRes.json();
-            u = {
-              id:        prof.id,
-              name:      prof.name      || prof.full_name || email.split("@")[0],
-              email:     prof.email     || email,
-              role:      prof.role      || "clerk",
-              cwsAccess: prof.cwsAccess || prof.cws_access || [],
-              machineId: prof.machineId || prof.machine_id || null,
-              active:    prof.active    !== false,
-            };
+          if (meRes.ok) {
+            const me = await meRes.json();
+            profile = { ...profile, ...me };
           }
         } catch (_) {}
-      }
 
-      if (!u && data.user) {
-        const p = data.user;
-        u = {
-          id:        p.id,
-          name:      p.name      || p.full_name || email.split("@")[0],
+        const p = profile;
+        const u = {
+          id:        p.id        || p.sub,
+          name:      p.name      || email.split("@")[0],
           email:     p.email     || email,
           role:      p.role      || "clerk",
           cwsAccess: p.cwsAccess || p.cws_access || [],
           machineId: p.machineId || p.machine_id || null,
-          active:    true,
+          avatar:    p.avatar    || email.slice(0,2).toUpperCase(),
+          active:    p.active    !== false,
+          password,  // keep for local fallback
         };
+        return u;
       }
-
-      return u || null;
-    } catch (e) {
-      // Complete offline fallback — already checked locals above
-      return null;
+    } catch (_) {
+      // Server unreachable — fall through to local
     }
+
+    // ── Step 2: Offline/local fallback ───────────────────────────────
+    // Check INIT_USERS and loaded users state (works without server)
+    const localMatch =
+      INIT_USERS.find(x => x.email === email && x.password === password && x.active) ||
+      users.find(x => x.email === email && x.password === password && x.active);
+
+    if (localMatch) return localMatch;
+
+    return null;
   };
   const ctx = { users, setUsers, cwsList, setCwsList, farmers: farmers2, setFarmers, seasons, setSeasons, stationSeasons, setStationSeasons, cherry, setCherry, cashbook, setCashbook, bankTx, setBankTx, expenses, setExpenses, debts, setDebts, stock, setStock, fundRequests, setFundRequests, warehouseStock, setWarehouseStock, projects, setProjects, projectCosts, setProjectCosts, milestones, setMilestones, contractors, setContractors, machines, setMachines, assistants, setAssistants, tasks, setTasks, machTx, setMachTx, driverLogs, setDriverLogs, leaves, setLeaves, pending, setPending, system, setSystem, currentUser, online, setOnline, notifications, setNotifications, addNote, page, setPage, dbReady };
   if (!dbReady) return <div style={{ minHeight: "100vh", background: C.bg, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 16 }}>
