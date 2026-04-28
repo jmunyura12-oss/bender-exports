@@ -5,11 +5,11 @@ const SUPABASE_URL = "https://pcxsoxgwtwmdczcnxjuj.supabase.co";
 const SERVICE_KEY  = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBjeHNveGd3dHdtZGN6Y254anVqIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NTAyNzQxMiwiZXhwIjoyMDkwNjAzNDEyfQ.8QY8cg34GUSekreFq8_IQBPzABGIdgHo7HnKoyxdRHc";
 
 const USERS = [
-  { email: "sudo@bender.rw",          password: "sudo@123#",   name: "Munyura jeremie", role: "sudo",            cwsAccess: [],                                avatar: "MJ" },
-  { email: "md@bender.rw",            password: "md@123",     name: "Horanimpundu Jean Paul", role: "md",              cwsAccess: [],                                avatar: "JP" },
+  { email: "sudo@bender.rw",          password: "sudo123",   name: "Jean Pierre Habimana", role: "sudo",            cwsAccess: [],                                avatar: "JP" },
+  { email: "md@bender.rw",            password: "md123",     name: "Marie Claire Uwimana", role: "md",              cwsAccess: [],                                avatar: "MC" },
   { email: "admin@bender.rw",         password: "admin123",  name: "Patrick Nzabonimpa",   role: "admin",           cwsAccess: [],                                avatar: "PN" },
-  { email: "hqfin@bender.rw",         password: "fin123",    name: "Uwamariya Odette",       role: "hq_finance",      cwsAccess: [],                                avatar: "UO" },
-  { email: "hqacc@bender.rw",         password: "hqacc123",  name: "Kambanda Emmanuelle",     role: "hq_accountant",   cwsAccess: [],                                avatar: "K" },
+  { email: "hqfin@bender.rw",         password: "fin123",    name: "Grace Ingabire",       role: "hq_finance",      cwsAccess: [],                                avatar: "GI" },
+  { email: "hqacc@bender.rw",         password: "hqacc123",  name: "Claudine Umuhoza",     role: "hq_accountant",   cwsAccess: [],                                avatar: "CU" },
   { email: "hqop@bender.rw",          password: "hqop123",   name: "Samuel Bizimana",      role: "hq_ops",          cwsAccess: [],                                avatar: "SB" },
   { email: "mgr.musaza@bender.rw",    password: "mgr123",    name: "Alice Mutesi",         role: "station_manager", cwsAccess: ["cws1"],                          avatar: "AM" },
   { email: "mgr.nyungwe@bender.rw",   password: "mgr123",    name: "Robert Nkusi",         role: "station_manager", cwsAccess: ["cws2"],                          avatar: "RN" },
