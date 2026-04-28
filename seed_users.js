@@ -1,8 +1,25 @@
-// Run this ONCE on your server:  node seed_users.js
-// It creates all 17 users in Supabase Auth + profiles table
+// Run this ONCE on your local machine (NOT on Railway):
+//   node seed_users.js
+//
+// Reads credentials from .env — never hardcode keys in this file.
+// Requires Node >= 18 (uses global fetch).
 
-const SUPABASE_URL = "https://pcxsoxgwtwmdczcnxjuj.supabase.co";
-const SERVICE_KEY  = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBjeHNveGd3dHdtZGN6Y254anVqIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NTAyNzQxMiwiZXhwIjoyMDkwNjAzNDEyfQ.8QY8cg34GUSekreFq8_IQBPzABGIdgHo7HnKoyxdRHc";
+// ── Node version guard ───────────────────────────────────────────────
+const [major] = process.versions.node.split(".").map(Number);
+if (major < 18) {
+  console.error(`\n  ❌  Node ${process.versions.node} detected — Node 18+ is required (for global fetch).\n`);
+  process.exit(1);
+}
+
+require("dotenv").config();   // loads .env automatically
+
+const SUPABASE_URL = process.env.SUPABASE_URL;
+const SERVICE_KEY  = process.env.SUPABASE_SERVICE_KEY;
+
+if (!SUPABASE_URL || !SERVICE_KEY) {
+  console.error("\n  ❌  Missing env vars. Make sure .env contains SUPABASE_URL and SUPABASE_SERVICE_KEY.\n");
+  process.exit(1);
+}
 
 const USERS = [
   { email: "sudo@bender.rw",          password: "sudo123",   name: "Jean Pierre Habimana", role: "sudo",            cwsAccess: [],                                avatar: "JP" },
