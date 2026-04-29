@@ -106,149 +106,32 @@ input,select,textarea,button{font-family:'Inter',sans-serif;}
 }`;
 const Ctx = createContext(null);
 const useApp = () => useContext(Ctx);
-const INIT_CWS = [
-  { id: "musaza", name: "Musaza CWS", region: "Northern Province", image: "https://images.unsplash.com/photo-1559305616-3f99cd43e353?w=600&q=70" },
-  { id: "nyungwe", name: "Nyungwe CWS", region: "Western Province", image: "https://images.unsplash.com/photo-1523741543316-beb7fc7023d8?w=600&q=70" },
-  { id: "nyarubaka", name: "Nyarubaka CWS", region: "Southern Province", image: "https://images.unsplash.com/photo-1495107334309-fcf20504a5ab?w=600&q=70" }
-];
-const INIT_FARMERS = [
-  { id: "f1", cwsId: "musaza", name: "Jean Bosco Nshimiyimana", farmerId: "MSZ-001", group: "Amakara Group", balance: 0, phone: "+250788111001", createdAt: "2024-01-10", active: true },
-  { id: "f2", cwsId: "musaza", name: "Vestine Mukamwiza", farmerId: "MSZ-002", group: "Amakara Group", balance: 15e3, phone: "+250788111002", createdAt: "2024-01-10", active: true },
-  { id: "f3", cwsId: "musaza", name: "Protais Habimana", farmerId: "MSZ-003", group: "Inzoga Group", balance: 0, phone: "+250788111003", createdAt: "2024-01-15", active: true },
-  { id: "f4", cwsId: "nyungwe", name: "Alphonsine Uwamariya", farmerId: "NYU-001", group: "Tuzamuke Group", balance: 8e3, phone: "+250788222001", createdAt: "2024-01-10", active: true },
-  { id: "f5", cwsId: "nyungwe", name: "Theogene Niyonzima", farmerId: "NYU-002", group: "Tuzamuke Group", balance: 0, phone: "+250788222002", createdAt: "2024-01-12", active: true },
-  { id: "f6", cwsId: "nyarubaka", name: "Esperance Nizeyimana", farmerId: "NYB-001", group: "Inkesha Group", balance: 0, phone: "+250788333001", createdAt: "2024-01-10", active: true },
-  { id: "f7", cwsId: "nyarubaka", name: "Faustin Twagirayezu", farmerId: "NYB-002", group: "Inkesha Group", balance: 5e3, phone: "+250788333002", createdAt: "2024-01-14", active: true }
-];
-const INIT_CHERRY = [
-  { id: "ch1", cwsId: "musaza", farmerId: "f1", date: "2025-03-10", gnrNumber: "GNR-MSZ-0001", standardKg: 320, flotantKg: 18, totalKg: 338, rateStandard: 155, rateFlotant: 80, paymentStandard: 49600, paymentFlotant: 1440, totalPaid: 51040, avgRate: 151, paymentMethod: "cash", status: "paid", by: "u_clerk1" },
-  { id: "ch2", cwsId: "musaza", farmerId: "f2", date: "2025-03-10", gnrNumber: "GNR-MSZ-0002", standardKg: 480, flotantKg: 25, totalKg: 505, rateStandard: 155, rateFlotant: 80, paymentStandard: 74400, paymentFlotant: 2e3, totalPaid: 76400, avgRate: 151.3, paymentMethod: "mobile_money", status: "paid", by: "u_clerk1" },
-  { id: "ch3", cwsId: "musaza", farmerId: "f3", date: "2025-03-11", gnrNumber: "GNR-MSZ-0003", standardKg: 210, flotantKg: 12, totalKg: 222, rateStandard: 155, rateFlotant: 80, paymentStandard: 32550, paymentFlotant: 960, totalPaid: 33510, avgRate: 150.9, paymentMethod: "cash", status: "paid", by: "u_clerk1" },
-  { id: "ch4", cwsId: "nyungwe", farmerId: "f4", date: "2025-03-10", gnrNumber: "GNR-NYU-0001", standardKg: 540, flotantKg: 30, totalKg: 570, rateStandard: 152, rateFlotant: 78, paymentStandard: 82080, paymentFlotant: 2340, totalPaid: 84420, avgRate: 148.1, paymentMethod: "cash", status: "paid", by: "u_clerk2" },
-  { id: "ch5", cwsId: "nyungwe", farmerId: "f5", date: "2025-03-11", gnrNumber: "GNR-NYU-0002", standardKg: 380, flotantKg: 20, totalKg: 400, rateStandard: 152, rateFlotant: 78, paymentStandard: 57760, paymentFlotant: 1560, totalPaid: 59320, avgRate: 148.3, paymentMethod: "mobile_money", status: "paid", by: "u_clerk2" },
-  { id: "ch5b", cwsId: "nyungwe", farmerId: "f4", date: "2025-03-12", gnrNumber: "GNR-NYU-0003", standardKg: 310, flotantKg: 14, totalKg: 324, rateStandard: 152, rateFlotant: 78, paymentStandard: 47120, paymentFlotant: 1092, totalPaid: 48212, avgRate: 148.8, paymentMethod: null, status: "pending", by: "u_clerk2", paidBy: null, paidAt: null },
-  { id: "ch6", cwsId: "nyarubaka", farmerId: "f6", date: "2025-03-10", gnrNumber: "GNR-NYB-0001", standardKg: 290, flotantKg: 15, totalKg: 305, rateStandard: 150, rateFlotant: 75, paymentStandard: 43500, paymentFlotant: 1125, totalPaid: 44625, avgRate: 146.3, paymentMethod: "cash", status: "paid", by: "u_clerk3", paidBy: "u_cashier3", paidAt: "2025-03-10 09:00" },
-  { id: "ch7", cwsId: "nyarubaka", farmerId: "f7", date: "2025-03-12", gnrNumber: "GNR-NYB-0002", standardKg: 420, flotantKg: 22, totalKg: 442, rateStandard: 150, rateFlotant: 75, paymentStandard: 63e3, paymentFlotant: 1650, totalPaid: 64650, avgRate: 146.3, paymentMethod: null, status: "not_paid", by: "u_clerk3", paidBy: null, paidAt: null, notes: "Cash shortage \u2014 farmer owed" }
-];
-const INIT_CASHBOOK = [
-  { id: "cb1", cwsId: "musaza", date: "2025-03-10", type: "inflow", category: "Fund Transfer", description: "Opening funds from HQ", amount: 3e6, balance: 3e6, ref: "FT-001", by: "u_cashier1" },
-  { id: "cb2", cwsId: "musaza", date: "2025-03-10", type: "outflow", category: "Cherry Payment", description: "Payments to farmers GNR-MSZ-0001 & 0002", amount: 127440, balance: 2872560, ref: "CH-PAY-001", by: "u_cashier1" },
-  { id: "cb3", cwsId: "musaza", date: "2025-03-11", type: "outflow", category: "Cherry Payment", description: "Payments to farmers GNR-MSZ-0003", amount: 33510, balance: 2839050, ref: "CH-PAY-002", by: "u_cashier1" },
-  { id: "cb4", cwsId: "nyungwe", date: "2025-03-10", type: "inflow", category: "Fund Transfer", description: "Opening funds from HQ", amount: 25e5, balance: 25e5, ref: "FT-002", by: "u_cashier2" },
-  { id: "cb5", cwsId: "nyungwe", date: "2025-03-10", type: "outflow", category: "Cherry Payment", description: "Payments GNR-NYU-0001", amount: 84420, balance: 2415580, ref: "CH-PAY-003", by: "u_cashier2" },
-  { id: "cb6", cwsId: "nyarubaka", date: "2025-03-10", type: "inflow", category: "Fund Transfer", description: "Opening funds from HQ", amount: 2e6, balance: 2e6, ref: "FT-003", by: "u_cashier3" }
-];
-const INIT_BANK = [
-  { id: "bk1", cwsId: "musaza", date: "2025-03-01", type: "credit", description: "HQ bank transfer to station account", amount: 5e6, balance: 5e6, ref: "BK-IN-001", by: "u_hqfin" },
-  { id: "bk2", cwsId: "musaza", date: "2025-03-05", type: "debit", description: "Withdrawal for operational cash", amount: 3e6, balance: 2e6, ref: "BK-OUT-001", by: "u_hqfin" },
-  { id: "bk3", cwsId: "nyungwe", date: "2025-03-01", type: "credit", description: "HQ bank transfer", amount: 4e6, balance: 4e6, ref: "BK-IN-002", by: "u_hqfin" }
-];
-const INIT_EXPENSES = [
-  { id: "ex1", cwsId: "musaza", date: "2025-03-10", category: "Wages", description: "Daily casual workers - 12 pax", amount: 84e3, exploitable: true, status: "approved", by: "u_mgr1" },
-  { id: "ex2", cwsId: "musaza", date: "2025-03-10", category: "Energy", description: "Fuel for pulping machine", amount: 45e3, exploitable: true, status: "approved", by: "u_mgr1" },
-  { id: "ex3", cwsId: "musaza", date: "2025-03-11", category: "Packaging", description: "GrainPro bags x50", amount: 62500, exploitable: true, status: "approved", by: "u_mgr1" },
-  { id: "ex4", cwsId: "musaza", date: "2025-03-11", category: "Bank Charges", description: "Mobile money transfer fees", amount: 3200, exploitable: false, status: "approved", by: "u_mgr1" },
-  { id: "ex5", cwsId: "nyungwe", date: "2025-03-10", category: "Wages", description: "Daily workers - 10 pax", amount: 7e4, exploitable: true, status: "approved", by: "u_mgr2" },
-  { id: "ex6", cwsId: "nyungwe", date: "2025-03-10", category: "Energy", description: "Diesel generator", amount: 38e3, exploitable: true, status: "approved", by: "u_mgr2" },
-  { id: "ex7", cwsId: "nyarubaka", date: "2025-03-10", category: "Wages", description: "Daily workers - 8 pax", amount: 56e3, exploitable: true, status: "approved", by: "u_mgr3" },
-  { id: "ex8", cwsId: "nyarubaka", date: "2025-03-10", category: "Transport", description: "Cherry collection truck", amount: 28e3, exploitable: true, status: "approved", by: "u_mgr3" }
-];
-const INIT_DEBTS = [
-  { id: "dt1", cwsId: "musaza", date: "2025-02-15", type: "debt_given", party: "Jean Bosco Nshimiyimana", description: "Input loan \u2014 fertiliser", amount: 5e4, balance: 5e4, status: "outstanding" },
-  { id: "dt2", cwsId: "musaza", date: "2025-01-20", type: "debt_to_others", party: "Agro Supplies Kigali", description: "Pending payment for bags", amount: 12e4, balance: 8e4, status: "partial" },
-  { id: "dt3", cwsId: "nyungwe", date: "2025-02-10", type: "debt_given", party: "Alphonsine Uwamariya", description: "Input loan \u2014 seedlings", amount: 3e4, balance: 3e4, status: "outstanding" }
-];
-const INIT_STOCK = [
-  { id: "sk1", cwsId: "musaza", date: "2025-03-11", description: "Parchment coffee - dry mill ready", grade: "Parchment", tonnesIn: 2.1, tonnesOut: 0, tonnesBalance: 2.1, unitCost: 1800, totalValue: 378e4, valuationMethod: "weighted_avg" },
-  { id: "sk2", cwsId: "nyungwe", date: "2025-03-11", description: "Parchment coffee batch", grade: "Parchment", tonnesIn: 1.8, tonnesOut: 0, tonnesBalance: 1.8, unitCost: 1750, totalValue: 315e4, valuationMethod: "weighted_avg" },
-  { id: "sk3", cwsId: "nyarubaka", date: "2025-03-12", description: "Parchment batch A", grade: "Parchment", tonnesIn: 1.5, tonnesOut: 0, tonnesBalance: 1.5, unitCost: 1700, totalValue: 255e4, valuationMethod: "weighted_avg" }
-];
-const INIT_FUND_REQUESTS = [
-  { id: "fr1", cwsId: "musaza", requestedBy: "u_mgr1", amount: 2e6, reason: "Week 2 cherry purchase payments", status: "approved", requestedAt: "2025-03-12 08:00", verifiedBy: "u_hqop", verifiedAt: "2025-03-12 09:30", approvedBy: "u_md", approvedAt: "2025-03-12 10:15", transferMethod: "bank_transfer", transferRef: "FT-W2-001", notes: "" },
-  { id: "fr2", cwsId: "nyungwe", requestedBy: "u_mgr2", amount: 15e5, reason: "Week 2 payments + wages", status: "pending_verification", requestedAt: "2025-03-13 07:45", verifiedBy: null, verifiedAt: null, approvedBy: null, approvedAt: null, transferMethod: null, transferRef: null, notes: "" },
-  { id: "fr3", cwsId: "nyarubaka", requestedBy: "u_mgr3", amount: 12e5, reason: "Cherry purchases week 2", status: "pending_verification", requestedAt: "2025-03-13 08:30", verifiedBy: null, verifiedAt: null, approvedBy: null, approvedAt: null, transferMethod: null, transferRef: null, notes: "" }
-];
-const INIT_MACHINES = [
-  { id: "m1", name: "Excavator CAT 320", type: "Excavator", plate: "RAC 001A", status: "available", driverId: "u_drv1", assistantId: "a1" },
-  { id: "m2", name: "Bulldozer D6", type: "Bulldozer", plate: "RAC 002B", status: "on_task", driverId: "u_drv2", assistantId: "a2" },
-  { id: "m3", name: "Tower Crane 30T", type: "Crane", plate: "RAC 003C", status: "maintenance", driverId: null, assistantId: null }
-];
-const INIT_ASSISTANTS = [
-  { id: "a1", name: "Emmanuel Hakizimana", machineId: "m1", phone: "+250788001001" },
-  { id: "a2", name: "Celestin Niyonzima", machineId: "m2", phone: "+250788001002" }
-];
-const INIT_TASKS = [
-  { id: "t1", machineId: "m2", customer: "RSSB", province: "Kigali", district: "Gasabo", sector: "Kimironko", cell: "Bibare", village: "Amahoro", startDate: "2025-03-01", endDate: "2025-03-31", hourlyRate: 45e3, status: "active", totalHours: 120, notes: "Foundation excavation" }
-];
-const INIT_MACH_TX = [
-  { id: "mt1", machineId: "m1", date: "2025-03-01", type: "income", category: "Rental Income", amount: 18e5, desc: "CAT320 RSSB 30d", status: "synced" },
-  { id: "mt2", machineId: "m2", date: "2025-03-01", type: "income", category: "Rental Income", amount: 12e5, desc: "D6 Gasabo 20d", status: "synced" },
-  { id: "mt3", machineId: "m1", date: "2025-03-05", type: "expense", category: "Maintenance", amount: 24e4, desc: "Engine service", status: "synced" }
-];
-const INIT_DRIVER_LOGS = [
-  { id: "dl1", driverId: "u_drv1", machineId: "m1", date: "2025-03-10", hours: 8, fuelReceived: 120, taskLocation: "Gasabo, Kimironko", condition: "good", comments: "Normal operation", status: "submitted" },
-  { id: "dl2", driverId: "u_drv2", machineId: "m2", date: "2025-03-10", hours: 9, fuelReceived: 150, taskLocation: "Nyarugenge, Kiyovu", condition: "good", comments: "Minor hydraulic noise", status: "submitted" }
-];
-const INIT_LEAVES = [
-  { id: "lv1", driverId: "u_drv1", type: "off_day", date: "2025-03-15", reason: "Family commitment", status: "pending" }
-];
-const INIT_SEASONS = [
-  { id: "s1", name: "Season 2024-2025", startDate: "2024-10-01", endDate: "2025-06-30", rateStandard: 155, rateFlotant: 80, status: "active", createdBy: "u2", createdAt: "2024-09-15", closedAt: null, notes: "Main arabica season" },
-  { id: "s2", name: "Season 2023-2024", startDate: "2023-10-01", endDate: "2024-06-30", rateStandard: 148, rateFlotant: 75, status: "closed", createdBy: "u2", createdAt: "2023-09-10", closedAt: "2024-07-02", notes: "" }
-];
-const INIT_STATION_SEASONS = [
-  { id: "ss1", seasonId: "s1", cwsId: "musaza", startDate: "2024-10-05", endDate: null, status: "active" },
-  { id: "ss2", seasonId: "s1", cwsId: "nyungwe", startDate: "2024-10-10", endDate: null, status: "active" },
-  { id: "ss3", seasonId: "s1", cwsId: "nyarubaka", startDate: "2024-10-15", endDate: null, status: "active" },
-  { id: "ss4", seasonId: "s2", cwsId: "musaza", startDate: "2023-10-06", endDate: "2024-06-28", status: "closed" },
-  { id: "ss5", seasonId: "s2", cwsId: "nyungwe", startDate: "2023-10-12", endDate: "2024-06-25", status: "closed" }
-];
-const INIT_WAREHOUSE_STOCK = [
-  { id: "wh1", fromCwsId: "musaza", sentBy: "u_mgr1", date: "2025-03-12", grade: "Parchment", tonnes: 2.1, lotNumber: "LOT-MSZ-001", gnrRefs: "GNR-MSZ-0001,GNR-MSZ-0002", transportDetails: "Company truck RAC 100A", status: "confirmed", confirmedBy: "u_hqop", confirmedAt: "2025-03-12 14:30", notes: "First batch of season" },
-  { id: "wh2", fromCwsId: "nyungwe", sentBy: "u_mgr2", date: "2025-03-12", grade: "Parchment", tonnes: 1.8, lotNumber: "LOT-NYU-001", gnrRefs: "GNR-NYU-0001", transportDetails: "Company truck RAC 101B", status: "pending", confirmedBy: null, confirmedAt: null, notes: "" }
-];
-const INIT_PROJECTS = [
-  { id: "p1", name: "Kigali Office Renovation", client: "Internal", budget: 15e6, startDate: "2025-02-01", endDate: "2025-05-31", status: "active", description: "Renovation of HQ offices in Kigali", createdBy: "u2" },
-  { id: "p2", name: "Nyungwe Access Road", client: "Rwanda Roads Authority", budget: 8e7, startDate: "2025-04-01", endDate: "2025-12-31", status: "planning", description: "Construction of 12km access road to Nyungwe CWS", createdBy: "u2" }
-];
-const INIT_PROJECT_COSTS = [
-  { id: "pc1", projectId: "p1", date: "2025-02-10", category: "Materials", description: "Cement and tiles \u2014 200 bags", amount: 32e5, by: "u3" },
-  { id: "pc2", projectId: "p1", date: "2025-02-15", category: "Labor", description: "Construction team \u2014 week 2", amount: 18e5, by: "u3" },
-  { id: "pc3", projectId: "p1", date: "2025-03-01", category: "Materials", description: "Paint and fittings", amount: 85e4, by: "u3" }
-];
-const INIT_MILESTONES = [
-  { id: "m1", projectId: "p1", title: "Foundation & Demolition", targetDate: "2025-02-28", completedDate: "2025-02-26", status: "completed" },
-  { id: "m2", projectId: "p1", title: "Structural Work", targetDate: "2025-03-31", completedDate: null, status: "in_progress" },
-  { id: "m3", projectId: "p1", title: "Finishing & Handover", targetDate: "2025-05-31", completedDate: null, status: "pending" }
-];
-const INIT_CONTRACTORS = [
-  { id: "con1", projectId: "p1", name: "Kigali Build Co.", role: "Main Contractor", phone: "+250788500001", contractValue: 8e6, status: "active" }
-];
-const SEED_VERSION = "v2.1"; // bump this to force re-seed on all clients
-const INIT_USERS = [
-  // HQ
-  { id: "u1", name: "Jean Pierre Habimana", email: "sudo@bender.rw", password: "sudo123", role: "sudo", cwsAccess: [], machineId: null, avatar: "JP", createdAt: "2024-01-01", active: true },
-  { id: "u2", name: "Marie Claire Uwimana", email: "md@bender.rw", password: "md123", role: "md", cwsAccess: [], machineId: null, avatar: "MC", createdAt: "2024-01-01", active: true },
-  { id: "u3", name: "Patrick Nzabonimpa", email: "admin@bender.rw", password: "admin123", role: "admin", cwsAccess: [], machineId: null, avatar: "PN", createdAt: "2024-01-10", active: true },
-  { id: "u_hqfin", name: "Grace Ingabire", email: "hqfin@bender.rw", password: "fin123", role: "hq_finance", cwsAccess: [], machineId: null, avatar: "GI", createdAt: "2024-01-10", active: true },
-  { id: "u_hqacc", name: "Claudine Umuhoza", email: "hqacc@bender.rw", password: "hqacc123", role: "hq_accountant", cwsAccess: [], machineId: null, avatar: "CU", createdAt: "2024-02-10", active: true },
-  { id: "u_hqop", name: "Samuel Bizimana", email: "hqop@bender.rw", password: "hqop123", role: "hq_ops", cwsAccess: [], machineId: null, avatar: "SB", createdAt: "2024-02-01", active: true },
-  // Station Managers
-  { id: "u_mgr1", name: "Alice Mutesi", email: "mgr.musaza@bender.rw", password: "mgr123", role: "station_manager", cwsAccess: ["musaza"], machineId: null, avatar: "AM", createdAt: "2024-01-15", active: true },
-  { id: "u_mgr2", name: "Robert Nkusi", email: "mgr.nyungwe@bender.rw", password: "mgr123", role: "station_manager", cwsAccess: ["nyungwe"], machineId: null, avatar: "RN", createdAt: "2024-01-15", active: true },
-  { id: "u_mgr3", name: "Eric Habimana", email: "mgr.nyarubaka@bender.rw", password: "mgr123", role: "station_manager", cwsAccess: ["nyarubaka"], machineId: null, avatar: "EH", createdAt: "2024-01-15", active: true },
-  // Cashiers
-  { id: "u_cashier1", name: "Diane Uwase", email: "cash.musaza@bender.rw", password: "cash123", role: "cashier", cwsAccess: ["musaza"], machineId: null, avatar: "DU", createdAt: "2024-02-01", active: true },
-  { id: "u_cashier2", name: "Sandrine Mukamana", email: "cash.nyungwe@bender.rw", password: "cash123", role: "cashier", cwsAccess: ["nyungwe"], machineId: null, avatar: "SM", createdAt: "2024-02-01", active: true },
-  { id: "u_cashier3", name: "Thierry Nkurunziza", email: "cash.nyarubaka@bender.rw", password: "cash123", role: "cashier", cwsAccess: ["nyarubaka"], machineId: null, avatar: "TN", createdAt: "2024-02-01", active: true },
-  // Clerks
-  { id: "u_clerk1", name: "Celestin Hategeka", email: "clerk.musaza@bender.rw", password: "clerk123", role: "clerk", cwsAccess: ["musaza"], machineId: null, avatar: "CH", createdAt: "2024-02-15", active: true },
-  { id: "u_clerk2", name: "Yvonne Uwera", email: "clerk.nyungwe@bender.rw", password: "clerk123", role: "clerk", cwsAccess: ["nyungwe"], machineId: null, avatar: "YU", createdAt: "2024-02-15", active: true },
-  { id: "u_clerk3", name: "Pacifique Nkurunziza", email: "clerk.nyarubaka@bender.rw", password: "clerk123", role: "clerk", cwsAccess: ["nyarubaka"], machineId: null, avatar: "PK", createdAt: "2024-02-15", active: true },
-  // Drivers
-  { id: "u_drv1", name: "Claude Niyomugabo", email: "driver1@bender.rw", password: "drv123", role: "driver", cwsAccess: [], machineId: "m1", avatar: "CN", createdAt: "2024-03-01", active: true },
-  { id: "u_drv2", name: "Th\xE9ophile Gasana", email: "driver2@bender.rw", password: "drv123", role: "driver", cwsAccess: [], machineId: "m2", avatar: "TG", createdAt: "2024-03-01", active: true }
-];
+// ── Seed data removed — Supabase is the only source of truth ────────
+// All data is pulled from Supabase on boot. Nothing is hardcoded here.
+// To add initial data, use seed_users.js or insert directly in Supabase.
+const INIT_CWS             = [];
+const INIT_FARMERS         = [];
+const INIT_CHERRY          = [];
+const INIT_CASHBOOK        = [];
+const INIT_BANK            = [];
+const INIT_EXPENSES        = [];
+const INIT_DEBTS           = [];
+const INIT_STOCK           = [];
+const INIT_FUND_REQUESTS   = [];
+const INIT_MACHINES        = [];
+const INIT_ASSISTANTS      = [];
+const INIT_TASKS           = [];
+const INIT_MACH_TX         = [];
+const INIT_DRIVER_LOGS     = [];
+const INIT_LEAVES          = [];
+const INIT_SEASONS         = [];
+const INIT_STATION_SEASONS = [];
+const INIT_WAREHOUSE_STOCK = [];
+const INIT_PROJECTS        = [];
+const INIT_PROJECT_COSTS   = [];
+const INIT_MILESTONES      = [];
+const INIT_CONTRACTORS     = [];
+const INIT_USERS           = [];
 const INIT_PENDING = [];
 const INIT_SYSTEM = {
   logoUrl: null,
@@ -667,74 +550,50 @@ function App() {
   useEffect(() => {
     async function init() {
       try {
-        const seeded = await DB.isSeeded();
-        if (seeded) {
-          const d = await DB.loadAll();
-          if (d.users) {
-            const merged = d.users.map(u => {
-              const init = INIT_USERS.find(x => x.id === u.id || x.email === u.email);
-              return { ...u, cwsAccess: u.cwsAccess || [], password: u.password || (init ? init.password : "") };
-            });
-            setUsersRaw(merged);
-          }
-          if (d.cws) setCwsListRaw(d.cws);
-          if (d.farmers) setFarmersRaw(d.farmers);
-          if (d.seasons) setSeasonsRaw(d.seasons);
-          if (d.station_seasons) setStationSeasonsRaw(d.station_seasons);
-          if (d.cherry) setCherryRaw(d.cherry.map(c => ({
-            ...c,
-            totalKg:   +(c.totalKg   || 0),
-            standardKg:+(c.standardKg|| 0),
-            flotantKg: +(c.flotantKg || 0),
-            totalPaid: +(c.totalPaid || 0),
-            avgRate:   +(c.avgRate   || 0),
-          })));
-          if (d.cashbook) setCashbookRaw(d.cashbook);
-          if (d.bank) setBankTxRaw(d.bank);
-          if (d.expenses) setExpensesRaw(d.expenses);
-          if (d.debts) setDebtsRaw(d.debts);
-          if (d.stock) setStockRaw(d.stock);
-          if (d.fund_requests) setFundRequestsRaw(d.fund_requests);
-          if (d.warehouse) setWarehouseStockRaw(d.warehouse);
-          if (d.projects) setProjectsRaw(d.projects);
-          if (d.project_costs) setProjectCostsRaw(d.project_costs);
-          if (d.milestones) setMilestonesRaw(d.milestones);
-          if (d.contractors) setContractorsRaw(d.contractors);
-          if (d.machines) setMachinesRaw(d.machines);
-          if (d.assistants) setAssistantsRaw(d.assistants);
-          if (d.tasks) setTasksRaw(d.tasks);
-          if (d.mach_tx) setMachTxRaw(d.mach_tx);
-          if (d.driver_logs) setDriverLogsRaw(d.driver_logs);
-          if (d.leaves) setLeavesRaw(d.leaves);
-          if (d.system) setSystemRaw(d.system);
-        } else {
-          await DB.save("users", INIT_USERS);
-          setUsersRaw(INIT_USERS);
-          await DB.save("cws", INIT_CWS);
-          await DB.save("farmers", INIT_FARMERS);
-          await DB.save("seasons", INIT_SEASONS);
-          await DB.save("station_seasons", INIT_STATION_SEASONS);
-          await DB.save("cherry", INIT_CHERRY);
-          await DB.save("cashbook", INIT_CASHBOOK);
-          await DB.save("bank", INIT_BANK);
-          await DB.save("expenses", INIT_EXPENSES);
-          await DB.save("debts", INIT_DEBTS);
-          await DB.save("stock", INIT_STOCK);
-          await DB.save("fund_requests", INIT_FUND_REQUESTS);
-          await DB.save("warehouse", INIT_WAREHOUSE_STOCK);
-          await DB.save("projects", INIT_PROJECTS);
-          await DB.save("project_costs", INIT_PROJECT_COSTS);
-          await DB.save("milestones", INIT_MILESTONES);
-          await DB.save("contractors", INIT_CONTRACTORS);
-          await DB.save("machines", INIT_MACHINES);
-          await DB.save("assistants", INIT_ASSISTANTS);
-          await DB.save("tasks", INIT_TASKS);
-          await DB.save("mach_tx", INIT_MACH_TX);
-          await DB.save("driver_logs", INIT_DRIVER_LOGS);
-          await DB.save("leaves", INIT_LEAVES);
-          await DB.save("system", INIT_SYSTEM);
-          await DB.markSeeded();
+        // ── Supabase-first boot ───────────────────────────────────────
+        // Wipe any old demo localStorage from previous versions.
+        // SEED_VERSION bump ensures every machine runs this once.
+        if (!await DB.isSeeded()) {
+          DB.reset(); // clears all db:* keys and old seed flag
+          await DB.markSeeded(); // mark done so this only runs once per version
+          console.log("[Bender] Old demo data cleared — Supabase is now source of truth");
         }
+
+        // Load whatever is cached in localStorage as the starting state
+        // (this is empty on first boot, or the last-known state when offline)
+        const d = await DB.loadAll();
+        if (d.users)           setUsersRaw(d.users.map(u => ({ ...u, cwsAccess: u.cwsAccess || [] })));
+        if (d.cws)             setCwsListRaw(d.cws);
+        if (d.farmers)         setFarmersRaw(d.farmers);
+        if (d.seasons)         setSeasonsRaw(d.seasons);
+        if (d.station_seasons) setStationSeasonsRaw(d.station_seasons);
+        if (d.cherry)          setCherryRaw(d.cherry.map(c => ({
+          ...c,
+          totalKg:    +(c.totalKg    || 0),
+          standardKg: +(c.standardKg || 0),
+          flotantKg:  +(c.flotantKg  || 0),
+          totalPaid:  +(c.totalPaid  || 0),
+          avgRate:    +(c.avgRate    || 0),
+        })));
+        if (d.cashbook)        setCashbookRaw(d.cashbook);
+        if (d.bank)            setBankTxRaw(d.bank);
+        if (d.expenses)        setExpensesRaw(d.expenses);
+        if (d.debts)           setDebtsRaw(d.debts);
+        if (d.stock)           setStockRaw(d.stock);
+        if (d.fund_requests)   setFundRequestsRaw(d.fund_requests);
+        if (d.warehouse)       setWarehouseStockRaw(d.warehouse);
+        if (d.projects)        setProjectsRaw(d.projects);
+        if (d.project_costs)   setProjectCostsRaw(d.project_costs);
+        if (d.milestones)      setMilestonesRaw(d.milestones);
+        if (d.contractors)     setContractorsRaw(d.contractors);
+        if (d.machines)        setMachinesRaw(d.machines);
+        if (d.assistants)      setAssistantsRaw(d.assistants);
+        if (d.tasks)           setTasksRaw(d.tasks);
+        if (d.mach_tx)         setMachTxRaw(d.mach_tx);
+        if (d.driver_logs)     setDriverLogsRaw(d.driver_logs);
+        if (d.leaves)          setLeavesRaw(d.leaves);
+        if (d.system)          setSystemRaw(d.system);
+        // Server pull below will immediately overwrite with real Supabase data
       } catch (e) {
         console.error("DB init error", e);
       }
@@ -801,14 +660,10 @@ function App() {
           if (usersRes.ok) {
             const serverUsers = await usersRes.json();
             if (Array.isArray(serverUsers) && serverUsers.length > 0) {
-              const merged = serverUsers.map(u => {
-                const init = INIT_USERS.find(x => x.email === (u.email || ""));
-                return {
-                  ...u,
-                  cwsAccess: u.cwsAccess || u.cws_access || [],
-                  password:  u.password  || (init ? init.password : ""),
-                };
-              });
+              const merged = serverUsers.map(u => ({
+                ...u,
+                cwsAccess: u.cwsAccess || u.cws_access || [],
+              }));
               setUsersRaw(merged);
               DB.save("users", merged);
             }
@@ -897,12 +752,11 @@ function App() {
       // Server unreachable — fall through to local
     }
 
-    // ── Step 2: Offline/local fallback ───────────────────────────────
-    // Check INIT_USERS and loaded users state (works without server)
-    const localMatch =
-      INIT_USERS.find(x => x.email === email && x.password === password && x.active) ||
-      users.find(x => x.email === email && x.password === password && x.active);
-
+    // ── Step 2: Offline fallback ─────────────────────────────────────
+    // Only match against real users previously pulled from Supabase and
+    // cached in localStorage. INIT_USERS (demo data) is intentionally
+    // excluded — demo IDs conflict with real Supabase UUIDs.
+    const localMatch = users.find(x => x.email === email && x.password === password && x.active !== false);
     if (localMatch) return localMatch;
 
     return null;
@@ -919,36 +773,9 @@ function App() {
     const u = await login(e, p);
     if (u) {
       setCurrentUser(u);
-      // If sudo, push INIT_USERS to Supabase profiles once (idempotent)
-      if (u.role === "sudo") {
-        try {
-          const token = localStorage.getItem("bender_token");
-          if (token) {
-            fetch("/api/seed-profiles", {
-              method: "POST",
-              headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
-              body: JSON.stringify({ users: INIT_USERS }),
-            }).then(r => r.json()).then(d => {
-              if (d.ok) {
-                console.log("[Bender] Profiles seeded to Supabase:", d.results?.length);
-                // Flush any queued user sync operations
-                const queue = JSON.parse(localStorage.getItem("user_sync_queue") || "[]");
-                if (queue.length > 0) {
-                  localStorage.removeItem("user_sync_queue");
-                  queue.forEach(({ method, userData }) => {
-                    fetch(method === "PUT" ? `/api/users/${encodeURIComponent(userData.supabaseId || userData.id)}` : "/api/users", {
-                      method,
-                      headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
-                      body: JSON.stringify({ name: userData.name, role: userData.role, email: userData.email, cwsAccess: userData.cwsAccess || [], machineId: userData.machineId || null, avatar: userData.avatar, active: userData.active, password: userData.password }),
-                    }).catch(() => {});
-                  });
-                  console.log("[Bender] Flushed", queue.length, "queued user changes");
-                }
-              }
-            }).catch(() => {});
-          }
-        } catch (_) {}
-      }
+      // Flush any offline ops that were queued before login completed
+      // (covers the case where the user was offline when they saved data)
+      await flushOfflineQueue();
     }
     return !!u;
   }} system={system} /></Ctx.Provider>;
@@ -1307,7 +1134,9 @@ function LoginPage({ onLogin, system }) {
   };
   return <div style={{ minHeight: "100vh", display: "flex", background: C.bg, flexDirection: "row" }}>
       <div style={{ flex: 1, position: "relative", overflow: "hidden" }} className="hide-mobile">
-        <LoginHero />
+        {system.heroImageUrl
+          ? <img src={system.heroImageUrl} alt="Login background" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }} />
+          : <LoginHero />}
         <div style={{ position: "absolute", inset: 0, background: "linear-gradient(135deg,rgba(8,14,10,.88) 0%,rgba(8,14,10,.35) 55%,rgba(8,14,10,.92) 100%)" }} />
         <div style={{ position: "absolute", height: "100%", width: "100%", display: "flex", flexDirection: "column", justifyContent: "space-between", padding: "40px 52px" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 14, position: "relative", zIndex: 1 }}>
@@ -1336,13 +1165,7 @@ function LoginPage({ onLogin, system }) {
           <div style={{ marginTop: 12 }}><FI label="Password" type="password" value={pw} onChange={setPw} placeholder="••••••••" onEnter={doLogin} /></div>
           {err && <div style={{ marginTop: 10, padding: "9px 13px", background: `${C.danger}12`, border: `1px solid ${C.danger}28`, borderRadius: 7, color: C.danger, fontSize: 13 }}>⚠ {err}</div>}
           <button onClick={doLogin} disabled={loading} style={{ ...BtnS(C.gold), width: "100%", marginTop: 18, padding: 13, justifyContent: "center", fontSize: 14, fontWeight: 700, minHeight: 48 }} onMouseEnter={(e) => e.target.style.background = C.goldLight} onMouseLeave={(e) => e.target.style.background = C.gold}>{loading ? "Signing in..." : "Sign In \u2192"}</button>
-          <div style={{ marginTop: 24, padding: 13, background: C.surface, borderRadius: 10, border: `1px solid ${C.border}` }}>
-            <div style={{ fontSize: 9, fontWeight: 700, color: C.textDim, textTransform: "uppercase", letterSpacing: "1.5px", marginBottom: 9 }}>Demo Accounts</div>
-            {INIT_USERS.map((u) => <div key={u.id} onClick={async () => { await onLogin(u.email, u.password); }} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "7px 7px", borderRadius: 6, cursor: "pointer", borderBottom: `1px solid ${C.border}15`, transition: "background .15s", minHeight: 44 }} onMouseEnter={(e) => e.currentTarget.style.background = C.border} onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}>
-                <div><div style={{ fontSize: 11, fontWeight: 600, color: C.text }}>{u.name}</div><div style={{ fontSize: 10, color: C.textMuted }}>{u.email}</div></div>
-                <RB role={u.role} sm />
-              </div>)}
-          </div>
+
         </div>
       </div>
     </div>;
@@ -3488,7 +3311,47 @@ function SystemPage() {
       {tab === "branding" && <div style={{ maxWidth: 480 }}>
           <FI label="Company Name" value={system.companyName} onChange={(v) => setSystem((p) => ({ ...p, companyName: v }))} />
           <div style={{ marginTop: 11 }}><FI label="Tagline" value={system.tagline} onChange={(v) => setSystem((p) => ({ ...p, tagline: v }))} /></div>
-          <div style={{ marginTop: 11 }}><FI label="Hero Image URL" value={system.heroImageUrl} onChange={(v) => setSystem((p) => ({ ...p, heroImageUrl: v }))} /></div>
+          <div style={{ marginTop: 16 }}>
+            <div style={{ fontSize: 10, fontWeight: 600, color: C.textMuted, textTransform: "uppercase", letterSpacing: "0.7px", marginBottom: 8 }}>Login Page Background Image</div>
+            {/* Preview */}
+            {system.heroImageUrl && <div style={{ position: "relative", marginBottom: 10, borderRadius: 10, overflow: "hidden", height: 140, border: `1px solid ${C.border}` }}>
+              <img src={system.heroImageUrl} alt="Preview" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+              <button onClick={() => setSystem(p => ({ ...p, heroImageUrl: "" }))} style={{ position: "absolute", top: 8, right: 8, background: "rgba(0,0,0,.7)", border: "none", borderRadius: 6, color: "#fff", fontSize: 11, padding: "4px 9px", cursor: "pointer", fontWeight: 600 }}>✕ Remove</button>
+            </div>}
+            {!system.heroImageUrl && <div style={{ height: 100, border: `2px dashed ${C.border}`, borderRadius: 10, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 6, marginBottom: 10, color: C.textDim, fontSize: 12 }}>
+              <span style={{ fontSize: 22, opacity: .4 }}>🖼</span>
+              No image set — SVG illustration shown
+            </div>}
+            {/* File upload */}
+            <label style={{ display: "block", marginBottom: 8 }}>
+              <div style={{ fontSize: 10, fontWeight: 600, color: C.textMuted, textTransform: "uppercase", letterSpacing: "0.7px", marginBottom: 6 }}>Upload from device</div>
+              <div style={{ position: "relative" }}>
+                <input type="file" accept="image/*" style={{ display: "none" }} id="hero-file-input" onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (!file) return;
+                  if (file.size > 5 * 1024 * 1024) { alert("Image must be under 5 MB"); return; }
+                  const reader = new FileReader();
+                  reader.onload = (ev) => setSystem(p => ({ ...p, heroImageUrl: ev.target.result }));
+                  reader.readAsDataURL(file);
+                  e.target.value = "";
+                }} />
+                <button onClick={() => document.getElementById("hero-file-input").click()} style={{ ...BtnS(C.gold, true), padding: "8px 16px", fontSize: 12, width: "100%", justifyContent: "center" }}>📁 Choose Image File</button>
+              </div>
+            </label>
+            {/* URL fallback */}
+            <div style={{ fontSize: 10, fontWeight: 600, color: C.textMuted, textTransform: "uppercase", letterSpacing: "0.7px", marginBottom: 6 }}>Or paste an image URL</div>
+            <input
+              type="url"
+              value={system.heroImageUrl?.startsWith("data:") ? "" : (system.heroImageUrl || "")}
+              onChange={(e) => setSystem(p => ({ ...p, heroImageUrl: e.target.value }))}
+              placeholder="https://example.com/photo.jpg"
+              style={{ width: "100%", padding: "10px 13px", background: C.bgDeep, border: `1.5px solid ${C.border}`, borderRadius: 10, color: C.text, fontSize: 13, outline: "none" }}
+              onFocus={e => { e.target.style.borderColor = C.gold; e.target.style.boxShadow = `0 0 0 3px ${C.gold}15`; }}
+              onBlur={e => { e.target.style.borderColor = C.border; e.target.style.boxShadow = "none"; }}
+            />
+            <div style={{ fontSize: 11, color: C.textDim, marginTop: 6 }}>Recommended: landscape photo, 1920×1080 or larger.</div>
+          </div>
+          <button onClick={() => { setSystem(p => ({ ...p })); addNote("Branding saved", "success"); }} style={{ ...BtnS(C.gold), marginTop: 20, padding: "8px 20px", fontSize: 12 }}>💾 Save Branding</button>
         </div>}
       {tab === "labels" && <div style={{ maxWidth: 480 }}>
           <div style={{ display: "grid", gap: 11 }}>
