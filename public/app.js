@@ -140,9 +140,9 @@ const INIT_SYSTEM = {
   tagline: "Integrated Financial Management \xB7 Kigali, Rwanda",
   labels: { coffee: "Bender Coffee", machinery: "Bender Machine", construction: "Bender Construction" },
   businessModels: [
-    { id: "coffee", label: "Bender Coffee", icon: "\u2615", active: true, imageUrl: "" },
-    { id: "machinery", label: "Bender Machine", icon: "\u{1F3D7}\uFE0F", active: true, imageUrl: "" },
-    { id: "construction", label: "Bender Construction", icon: "\u{1F3DB}\uFE0F", active: true, imageUrl: "" }
+    { id: "coffee", label: "Bender Coffee", icon: "\u2615", active: true },
+    { id: "machinery", label: "Bender Machine", icon: "\u{1F3D7}\uFE0F", active: true },
+    { id: "construction", label: "Bender Construction", icon: "\u{1F3DB}\uFE0F", active: true }
   ]
 };
 const ROLES = {
@@ -666,6 +666,19 @@ function App() {
               }));
               setUsersRaw(merged);
               DB.save("users", merged);
+            }
+          }
+          // Pull system config (branding, heroImageUrl, businessModels, etc.)
+          const sysRes = await apiFetch("/api/system");
+          if (sysRes.ok) {
+            const cfg = await sysRes.json();
+            if (cfg && typeof cfg === "object" && Object.keys(cfg).length > 0) {
+              const merged = { ...INIT_SYSTEM, ...cfg,
+                labels: { ...INIT_SYSTEM.labels, ...(cfg.labels || {}) },
+                businessModels: cfg.businessModels || INIT_SYSTEM.businessModels,
+              };
+              setSystemRaw(merged);
+              DB.save("system", merged);
             }
           }
         }
@@ -1478,7 +1491,6 @@ function HomePage() {
     color={C.coffee}
     colorLight={C.coffeeLight}
     colorBg={C.coffeeBg}
-    imageUrl={((system||{}).businessModels||[]).find(m=>m.id==="coffee")?.imageUrl || ""}
     stats={[{ l: "Cherry Purchased", v: fmtKg(totalCherryKg) }, { l: "Farmer Payments", v: fmtRWF(totalCherryPaid) }, { l: "Active Stations", v: cwsList.length }]}
   />
         <BizCard
@@ -1488,7 +1500,6 @@ function HomePage() {
     color={C.machinery}
     colorLight={C.machineryLight}
     colorBg={C.machineryBg}
-    imageUrl={((system||{}).businessModels||[]).find(m=>m.id==="machinery")?.imageUrl || ""}
     stats={[{ l: "Revenue", v: fmtRWF(totalMachIncome) }, { l: "Machines", v: (machines||[]).length }, { l: "Active Tasks", v: (tasks||[]).length }]}
   />
         <BizCard
@@ -1498,7 +1509,6 @@ function HomePage() {
     color={C.construction}
     colorLight={C.constructionLight}
     colorBg={C.constructionBg}
-    imageUrl={((system||{}).businessModels||[]).find(m=>m.id==="construction")?.imageUrl || ""}
     stats={[{ l: "Projects", v: "0" }, { l: "Status", v: "Upcoming" }, { l: "Revenue", v: "0 RWF" }]}
   />
       </div>
@@ -1521,7 +1531,7 @@ function HomePage() {
       </div>
     </div>;
 }
-function BizCard({ id, label, icon, color, colorLight, colorBg, stats = [], imageUrl }) {
+function BizCard({ id, label, icon, color, colorLight, colorBg, stats = [] }) {
   const { setPage } = useApp();
   return <div onClick={() => setPage({ view: id, sub: null })} style={{ background: `linear-gradient(145deg,${colorBg},${C.bgCard})`, border: `1px solid ${color}28`, borderRadius: 13, padding: "18px", cursor: "pointer", transition: "all .2s", position: "relative", overflow: "hidden" }} onMouseEnter={(e) => {
     e.currentTarget.style.borderColor = `${color}55`;
@@ -1530,18 +1540,14 @@ function BizCard({ id, label, icon, color, colorLight, colorBg, stats = [], imag
     e.currentTarget.style.borderColor = `${color}28`;
     e.currentTarget.style.transform = "translateY(0)";
   }}>
-      {imageUrl
-        ? <img src={imageUrl} alt="" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", opacity: 0.13, pointerEvents: "none" }} />
-        : <div style={{ position: "absolute", top: -15, right: -15, fontSize: 55, opacity: 0.05 }}>{icon}</div>}
-      <div style={{ position: "relative" }}>
-        <div style={{ fontSize: 24, marginBottom: 8 }}>{icon}</div>
-        <div style={{ fontFamily: "'Inter',sans-serif", fontSize: 16, letterSpacing: '-0.2px', fontWeight: 700, color: colorLight, marginBottom: 10 }}>{label}</div>
-        {stats.map((s) => <div key={s.l} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 5 }}>
-            <span style={{ fontSize: 10, color: C.textDim }}>{s.l}</span>
-            <span style={{ fontSize: 12, fontWeight: 700, color: C.text }}>{s.v}</span>
-          </div>)}
-        <div style={{ marginTop: 10, fontSize: 11, color, fontWeight: 700 }}>Open {label} →</div>
-      </div>
+      <div style={{ position: "absolute", top: -15, right: -15, fontSize: 55, opacity: 0.05 }}>{icon}</div>
+      <div style={{ fontSize: 24, marginBottom: 8 }}>{icon}</div>
+      <div style={{ fontFamily: "'Inter',sans-serif", fontSize: 16, letterSpacing: '-0.2px', fontWeight: 700, color: colorLight, marginBottom: 10 }}>{label}</div>
+      {stats.map((s) => <div key={s.l} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 5 }}>
+          <span style={{ fontSize: 10, color: C.textDim }}>{s.l}</span>
+          <span style={{ fontSize: 12, fontWeight: 700, color: C.text }}>{s.v}</span>
+        </div>)}
+      <div style={{ marginTop: 10, fontSize: 11, color, fontWeight: 700 }}>Open {label} →</div>
     </div>;
 }
 function CoffeePage() {
@@ -3310,57 +3316,7 @@ function SystemPage() {
   const { system, setSystem, cwsList, setCwsList, addNote } = useApp();
   const [tab, setTab] = useState("branding");
   const [labels, setLabels] = useState({ ...system.labels });
-  const [newCWS, setNewCWS] = useState({ name: "", region: "", image: "" });
-  const [uploading, setUploading] = useState(false);
-  const [saving, setSaving] = useState(false);
-
-  /* ── Upload any image to Supabase Storage ── */
-  const uploadImage = async (file, storagePath, onSuccess) => {
-    if (!file) return;
-    if (file.size > 5 * 1024 * 1024) { addNote("Image must be under 5 MB", "danger"); return; }
-    if (!window.__supabase) { addNote("Supabase not connected — paste a URL instead", "danger"); return; }
-    setUploading(true);
-    try {
-      const ext  = file.name.split(".").pop().toLowerCase() || "jpg";
-      const path = `${storagePath}-${Date.now()}.${ext}`;
-      const { error } = await window.__supabase.storage
-        .from("branding").upload(path, file, { upsert: true, contentType: file.type });
-      if (error) throw error;
-      const { data: ud } = window.__supabase.storage.from("branding").getPublicUrl(path);
-      if (!ud?.publicUrl) throw new Error("Could not get public URL");
-      onSuccess(ud.publicUrl);
-      addNote("Image uploaded ✓", "success");
-    } catch (err) {
-      addNote("Upload failed: " + (err.message || String(err)), "danger");
-    } finally { setUploading(false); }
-  };
-
-  /* ── Save branding + business model images to Supabase ── */
-  const saveBranding = async () => {
-    setSaving(true);
-    try {
-      const res = await apiFetch("/api/system", {
-        method: "PUT",
-        body: JSON.stringify({
-          companyName:    system.companyName,
-          tagline:        system.tagline,
-          heroImageUrl:   system.heroImageUrl,
-          businessModels: system.businessModels,
-        }),
-      });
-      if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error || "Save failed"); }
-      addNote("Branding saved ✓", "success");
-    } catch (err) {
-      addNote("Save failed: " + (err.message || String(err)), "danger");
-    } finally { setSaving(false); }
-  };
-
-  const imgUploadBtn = (id, onClick) =>
-    <button onClick={onClick} disabled={uploading}
-      style={{ ...BtnS(C.gold, true), padding: "8px 16px", fontSize: 12, width: "100%", justifyContent: "center", opacity: uploading ? 0.6 : 1 }}>
-      {uploading ? "⏳ Uploading…" : "📁 Choose Image File"}
-    </button>;
-
+  const [newCWS, setNewCWS] = useState({ name: "", region: "" });
   return <div>
       <div style={{ fontFamily: "'Inter',sans-serif", fontSize: 22, letterSpacing: '-0.4px', fontWeight: 700, color: C.text, marginBottom: 6 }}>System Configuration</div>
       <div style={{ fontSize: 13, color: C.textMuted, marginBottom: 18 }}>Super Admin settings — rename modules, manage stations, configure branding.</div>
@@ -3370,162 +3326,92 @@ function SystemPage() {
           <div style={{ marginTop: 11 }}><FI label="Tagline" value={system.tagline} onChange={(v) => setSystem((p) => ({ ...p, tagline: v }))} /></div>
           <div style={{ marginTop: 16 }}>
             <div style={{ fontSize: 10, fontWeight: 600, color: C.textMuted, textTransform: "uppercase", letterSpacing: "0.7px", marginBottom: 8 }}>Login Page Background Image</div>
-            {system.heroImageUrl
-              ? <div style={{ position: "relative", marginBottom: 10, borderRadius: 10, overflow: "hidden", height: 140, border: `1px solid ${C.border}` }}>
-                  <img src={system.heroImageUrl} alt="Preview" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                  <button onClick={() => setSystem(p => ({ ...p, heroImageUrl: "" }))} style={{ position: "absolute", top: 8, right: 8, background: "rgba(0,0,0,.7)", border: "none", borderRadius: 6, color: "#fff", fontSize: 11, padding: "4px 9px", cursor: "pointer", fontWeight: 600 }}>✕ Remove</button>
-                </div>
-              : <div style={{ height: 100, border: `2px dashed ${C.border}`, borderRadius: 10, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 6, marginBottom: 10, color: C.textDim, fontSize: 12 }}>
-                  <span style={{ fontSize: 22, opacity: .4 }}>🖼</span>No image set — SVG illustration shown
-                </div>}
-            <div style={{ marginBottom: 8 }}>
+            {/* Preview */}
+            {system.heroImageUrl && <div style={{ position: "relative", marginBottom: 10, borderRadius: 10, overflow: "hidden", height: 140, border: `1px solid ${C.border}` }}>
+              <img src={system.heroImageUrl} alt="Preview" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+              <button onClick={() => setSystem(p => ({ ...p, heroImageUrl: "" }))} style={{ position: "absolute", top: 8, right: 8, background: "rgba(0,0,0,.7)", border: "none", borderRadius: 6, color: "#fff", fontSize: 11, padding: "4px 9px", cursor: "pointer", fontWeight: 600 }}>✕ Remove</button>
+            </div>}
+            {!system.heroImageUrl && <div style={{ height: 100, border: `2px dashed ${C.border}`, borderRadius: 10, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 6, marginBottom: 10, color: C.textDim, fontSize: 12 }}>
+              <span style={{ fontSize: 22, opacity: .4 }}>🖼</span>
+              No image set — SVG illustration shown
+            </div>}
+            {/* File upload */}
+            <label style={{ display: "block", marginBottom: 8 }}>
               <div style={{ fontSize: 10, fontWeight: 600, color: C.textMuted, textTransform: "uppercase", letterSpacing: "0.7px", marginBottom: 6 }}>Upload from device</div>
-              <input type="file" accept="image/*" style={{ display: "none" }} id="hero-file-input"
-                onChange={(e) => { const f = e.target.files?.[0]; if (f) { uploadImage(f, "hero/login-bg", (url) => setSystem(p => ({ ...p, heroImageUrl: url }))); e.target.value = ""; } }} />
-              {imgUploadBtn("hero", () => document.getElementById("hero-file-input").click())}
-              {!window.__supabase && <div style={{ fontSize: 11, color: C.warning, marginTop: 6 }}>⚠ Supabase not connected — use URL below.</div>}
-            </div>
+              <div style={{ position: "relative" }}>
+                <input type="file" accept="image/*" style={{ display: "none" }} id="hero-file-input" onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (!file) return;
+                  if (file.size > 5 * 1024 * 1024) { alert("Image must be under 5 MB"); return; }
+                  const reader = new FileReader();
+                  reader.onload = (ev) => setSystem(p => ({ ...p, heroImageUrl: ev.target.result }));
+                  reader.readAsDataURL(file);
+                  e.target.value = "";
+                }} />
+                <button onClick={() => document.getElementById("hero-file-input").click()} style={{ ...BtnS(C.gold, true), padding: "8px 16px", fontSize: 12, width: "100%", justifyContent: "center" }}>📁 Choose Image File</button>
+              </div>
+            </label>
+            {/* URL fallback */}
             <div style={{ fontSize: 10, fontWeight: 600, color: C.textMuted, textTransform: "uppercase", letterSpacing: "0.7px", marginBottom: 6 }}>Or paste an image URL</div>
-            <input type="url" value={system.heroImageUrl?.startsWith("data:") ? "" : (system.heroImageUrl || "")}
+            <input
+              type="url"
+              value={system.heroImageUrl?.startsWith("data:") ? "" : (system.heroImageUrl || "")}
               onChange={(e) => setSystem(p => ({ ...p, heroImageUrl: e.target.value }))}
               placeholder="https://example.com/photo.jpg"
               style={{ width: "100%", padding: "10px 13px", background: C.bgDeep, border: `1.5px solid ${C.border}`, borderRadius: 10, color: C.text, fontSize: 13, outline: "none" }}
               onFocus={e => { e.target.style.borderColor = C.gold; e.target.style.boxShadow = `0 0 0 3px ${C.gold}15`; }}
-              onBlur={e => { e.target.style.borderColor = C.border; e.target.style.boxShadow = "none"; }} />
+              onBlur={e => { e.target.style.borderColor = C.border; e.target.style.boxShadow = "none"; }}
+            />
             <div style={{ fontSize: 11, color: C.textDim, marginTop: 6 }}>Recommended: landscape photo, 1920×1080 or larger.</div>
           </div>
-          <button onClick={saveBranding} disabled={saving || uploading} style={{ ...BtnS(C.gold), marginTop: 20, padding: "8px 20px", fontSize: 12, opacity: (saving || uploading) ? 0.6 : 1 }}>
-            {saving ? "⏳ Saving…" : "💾 Save Branding"}
-          </button>
+          <button onClick={async () => {
+            try {
+              const res = await apiFetch("/api/system", {
+                method: "PUT",
+                body: JSON.stringify({
+                  companyName:    system.companyName,
+                  tagline:        system.tagline,
+                  heroImageUrl:   system.heroImageUrl,
+                  businessModels: system.businessModels,
+                }),
+              });
+              if (!res.ok) { const e = await res.json().catch(()=>({})); throw new Error(e.error||"Save failed"); }
+              DB.save("system", system);
+              addNote("Branding saved ✓", "success");
+            } catch(err) { addNote("Save failed: " + err.message, "danger"); }
+          }} style={{ ...BtnS(C.gold), marginTop: 20, padding: "8px 20px", fontSize: 12 }}>💾 Save Branding</button>
         </div>}
-      {tab === "labels" && <div style={{ maxWidth: 520 }}>
-          {/* Module labels */}
-          <div style={{ display: "grid", gap: 11, marginBottom: 20 }}>
+      {tab === "labels" && <div style={{ maxWidth: 480 }}>
+          <div style={{ display: "grid", gap: 11 }}>
             {Object.entries(labels).map(([k, v]) => <FI key={k} label={k.replace(/_/g, " ")} value={v} onChange={(val) => setLabels((p) => ({ ...p, [k]: val }))} />)}
           </div>
           <button onClick={() => {
     setSystem((p) => ({ ...p, labels }));
     addNote("Labels updated", "success");
-  }} style={{ ...BtnS(C.gold), marginBottom: 24, padding: "8px 16px", fontSize: 12 }}>Save Labels</button>
-
-          {/* Business unit images */}
-          <div style={{ borderTop: `1px solid ${C.border}`, paddingTop: 20 }}>
-            <div style={{ fontWeight: 700, fontSize: 13, color: C.text, marginBottom: 4 }}>Business Unit Thumbnail Images</div>
-            <div style={{ fontSize: 11, color: C.textMuted, marginBottom: 16 }}>These appear as background images on each unit card on the dashboard.</div>
-            <div style={{ display: "grid", gap: 18 }}>
-              {(system.businessModels || []).map((m) => {
-                const colorMap = { coffee: C.coffee, machinery: C.machinery, construction: C.construction };
-                const col = colorMap[m.id] || C.gold;
-                return <div key={m.id} style={{ background: C.bgDeep, border: `1px solid ${col}28`, borderRadius: 12, padding: "14px 16px" }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
-                    <span style={{ fontSize: 18 }}>{m.icon}</span>
-                    <span style={{ fontWeight: 600, fontSize: 13, color: col }}>{m.label}</span>
-                  </div>
-                  {/* Preview */}
-                  {m.imageUrl
-                    ? <div style={{ position: "relative", height: 90, borderRadius: 8, overflow: "hidden", marginBottom: 10, border: `1px solid ${C.border}` }}>
-                        <img src={m.imageUrl} alt="Preview" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                        <button onClick={() => setSystem(p => ({ ...p, businessModels: p.businessModels.map(x => x.id === m.id ? { ...x, imageUrl: "" } : x) }))}
-                          style={{ position: "absolute", top: 6, right: 6, background: "rgba(0,0,0,.7)", border: "none", borderRadius: 5, color: "#fff", fontSize: 10, padding: "3px 7px", cursor: "pointer", fontWeight: 600 }}>✕</button>
-                      </div>
-                    : <div style={{ height: 70, border: `2px dashed ${C.border}`, borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 10, color: C.textDim, fontSize: 11 }}>No image — emoji watermark shown</div>}
-                  {/* Upload button */}
-                  <input type="file" accept="image/*" id={`biz-img-${m.id}`} style={{ display: "none" }} onChange={(e) => {
-                    const file = e.target.files?.[0]; e.target.value = "";
-                    if (!file) return;
-                    if (file.size > 5 * 1024 * 1024) { addNote("Image must be under 5 MB", "danger"); return; }
-                    if (!window.__supabase) { addNote("Supabase not connected — paste a URL instead", "danger"); return; }
-                    const ext = file.name.split(".").pop() || "jpg";
-                    const path = `biz/${m.id}-${Date.now()}.${ext}`;
-                    window.__supabase.storage.from("branding").upload(path, file, { upsert: true, contentType: file.type })
-                      .then(({ error }) => {
-                        if (error) throw error;
-                        const { data: ud } = window.__supabase.storage.from("branding").getPublicUrl(path);
-                        if (!ud?.publicUrl) throw new Error("No public URL");
-                        setSystem(p => ({ ...p, businessModels: p.businessModels.map(x => x.id === m.id ? { ...x, imageUrl: ud.publicUrl } : x) }));
-                        addNote(`${m.label} image uploaded ✓ — save branding to apply`, "success");
-                      })
-                      .catch(err => addNote("Upload failed: " + err.message, "danger"));
-                  }} />
-                  <div style={{ display: "flex", gap: 8 }}>
-                    <button onClick={() => document.getElementById(`biz-img-${m.id}`).click()} style={{ ...BtnS(col, true), fontSize: 11, padding: "6px 12px", flex: 1, justifyContent: "center" }}>📁 Upload Image</button>
-                  </div>
-                  {/* URL fallback */}
-                  <input type="url" value={m.imageUrl?.startsWith("data:") ? "" : (m.imageUrl || "")}
-                    onChange={(e) => setSystem(p => ({ ...p, businessModels: p.businessModels.map(x => x.id === m.id ? { ...x, imageUrl: e.target.value } : x) }))}
-                    placeholder="Or paste image URL…"
-                    style={{ width: "100%", marginTop: 8, padding: "8px 11px", background: C.bgCard, border: `1.5px solid ${C.border}`, borderRadius: 8, color: C.text, fontSize: 12, outline: "none" }}
-                    onFocus={e => { e.target.style.borderColor = col; }}
-                    onBlur={e => { e.target.style.borderColor = C.border; }} />
-                </div>;
-              })}
-            </div>
-            <button onClick={saveBranding} disabled={saving} style={{ ...BtnS(C.gold), marginTop: 16, padding: "8px 18px", fontSize: 12, opacity: saving ? 0.6 : 1 }}>
-              {saving ? "⏳ Saving…" : "💾 Save All Unit Images"}
-            </button>
-          </div>
+  }} style={{ ...BtnS(C.gold), marginTop: 16, padding: "8px 16px", fontSize: 12 }}>Save Labels</button>
         </div>}
       {tab === "stations" && <div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(160px,1fr))", gap: 12, marginBottom: 18 }}>
-            {cwsList.map((cws) => <div key={cws.id} style={{ background: C.gradCard, border: `1px solid ${C.coffee}28`, borderRadius: 11, overflow: "hidden" }}>
-                {cws.image && <div style={{ height: 60, position: "relative", overflow: "hidden" }}>
-                  <img src={cws.image} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", opacity: 0.7 }} />
-                </div>}
-                <div style={{ padding: "10px 14px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <div><div style={{ fontWeight: 600, color: C.coffeeLight, fontSize: 13 }}>{cws.name}</div><div style={{ fontSize: 11, color: C.textMuted }}>{cws.region}</div></div>
-                  <button onClick={() => {
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(130px,1fr))", gap: 12, marginBottom: 18 }}>
+            {cwsList.map((cws) => <div key={cws.id} style={{ background: C.gradCard, border: `1px solid ${C.coffee}28`, borderRadius: 11, padding: "14px 16px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <div><div style={{ fontWeight: 600, color: C.coffeeLight }}>{cws.name}</div><div style={{ fontSize: 11, color: C.textMuted }}>{cws.region}</div></div>
+                <button onClick={() => {
     setCwsList((p) => p.filter((c) => c.id !== cws.id));
     addNote(`${cws.name} removed`, "warning");
   }} style={{ ...BtnS(C.danger, false, true), fontSize: 10, padding: "3px 8px" }}>Remove</button>
-                </div>
               </div>)}
           </div>
-          <div style={{ background: C.gradCard, border: `1px solid ${C.border}`, borderRadius: 14, padding: "16px 18px", maxWidth: 420 }}>
+          <div style={{ background: C.gradCard, border: `1px solid ${C.border}`, borderRadius: 14, padding: "16px 18px", maxWidth: 400 }}>
             <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 12 }}>Add New Station</div>
             <div style={{ display: "grid", gap: 11 }}>
               <FI label="Station Name" value={newCWS.name} onChange={(v) => setNewCWS((p) => ({ ...p, name: v }))} placeholder="e.g. Rwamagana CWS" />
               <FI label="Region" value={newCWS.region} onChange={(v) => setNewCWS((p) => ({ ...p, region: v }))} placeholder="Province / Region" />
-              {/* Station image */}
-              <div>
-                <div style={{ fontSize: 10, fontWeight: 600, color: C.textMuted, textTransform: "uppercase", letterSpacing: "0.7px", marginBottom: 6 }}>Station Image</div>
-                {newCWS.image
-                  ? <div style={{ position: "relative", height: 90, borderRadius: 8, overflow: "hidden", marginBottom: 8, border: `1px solid ${C.border}` }}>
-                      <img src={newCWS.image} alt="Preview" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                      <button onClick={() => setNewCWS(p => ({ ...p, image: "" }))} style={{ position: "absolute", top: 6, right: 6, background: "rgba(0,0,0,.7)", border: "none", borderRadius: 5, color: "#fff", fontSize: 10, padding: "3px 7px", cursor: "pointer" }}>✕</button>
-                    </div>
-                  : <div style={{ height: 60, border: `2px dashed ${C.border}`, borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 8, color: C.textDim, fontSize: 11 }}>No image selected</div>}
-                <input type="file" accept="image/*" id="cws-img-input" style={{ display: "none" }} onChange={(e) => {
-                  const file = e.target.files?.[0]; e.target.value = "";
-                  if (!file) return;
-                  if (file.size > 5 * 1024 * 1024) { addNote("Image must be under 5 MB", "danger"); return; }
-                  if (!window.__supabase) { addNote("Supabase not connected — paste URL instead", "danger"); return; }
-                  const ext = file.name.split(".").pop() || "jpg";
-                  const path = `cws/${Date.now()}.${ext}`;
-                  window.__supabase.storage.from("branding").upload(path, file, { upsert: true, contentType: file.type })
-                    .then(({ error }) => {
-                      if (error) throw error;
-                      const { data: ud } = window.__supabase.storage.from("branding").getPublicUrl(path);
-                      if (!ud?.publicUrl) throw new Error("No public URL");
-                      setNewCWS(p => ({ ...p, image: ud.publicUrl }));
-                      addNote("Station image uploaded ✓", "success");
-                    })
-                    .catch(err => addNote("Upload failed: " + err.message, "danger"));
-                }} />
-                <button onClick={() => document.getElementById("cws-img-input").click()} style={{ ...BtnS(C.coffee, true), fontSize: 11, padding: "6px 12px", width: "100%", justifyContent: "center", marginBottom: 6 }}>📁 Upload Station Image</button>
-                <input type="url" value={newCWS.image?.startsWith("data:") ? "" : (newCWS.image || "")}
-                  onChange={(e) => setNewCWS(p => ({ ...p, image: e.target.value }))}
-                  placeholder="Or paste image URL…"
-                  style={{ width: "100%", padding: "8px 11px", background: C.bgDeep, border: `1.5px solid ${C.border}`, borderRadius: 8, color: C.text, fontSize: 12, outline: "none" }}
-                  onFocus={e => { e.target.style.borderColor = C.coffee; }}
-                  onBlur={e => { e.target.style.borderColor = C.border; }} />
-              </div>
             </div>
             <button onClick={() => {
     if (!newCWS.name) return;
-    setCwsList((p) => [...p, { ...newCWS, id: newCWS.name.toLowerCase().replace(/\s+cws$/, "").replace(/\s+/g, "_"), image: newCWS.image || "" }]);
-    setNewCWS({ name: "", region: "", image: "" });
+    setCwsList((p) => [...p, { ...newCWS, id: newCWS.name.toLowerCase().replace(/\s+cws$/, "").replace(/\s+/g, "_"), image: "https://images.unsplash.com/photo-1559305616-3f99cd43e353?w=600&q=70" }]);
+    setNewCWS({ name: "", region: "" });
     addNote(`${newCWS.name} added`, "success");
-  }} style={{ ...BtnS(C.coffee), marginTop: 14, fontSize: 12, padding: "7px 14px" }}>+ Add Station</button>
+  }} style={{ ...BtnS(C.coffee), marginTop: 12, fontSize: 12, padding: "7px 14px" }}>+ Add Station</button>
           </div>
         </div>}
     </div>;
