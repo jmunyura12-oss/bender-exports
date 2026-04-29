@@ -6,7 +6,7 @@
   "scripts": {
     "start": "node server/index.js",
     "dev": "node --watch server/index.js",
-    "seed": "node seed_users.js"
+   
   },
   "engines": {
     "node": ">=18"
