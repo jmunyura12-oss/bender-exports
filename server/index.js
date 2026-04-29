@@ -40,7 +40,7 @@ if (!SUPABASE_URL || !SUPABASE_KEY) {
 // The service-role key bypasses Row Level Security for server-side ops.
 
 async function sbFetch(path, opts = {}) {
-  const url = `${SUPABASE_URL}/rest/v1${path}`;
+  const url = `${SUPABASE_URL}/rest/v1/${path.replace(/^\/+/, "")}`;
   const res  = await fetch(url, {
     ...opts,
     headers: {
@@ -141,12 +141,29 @@ app.post("/api/auth/login", async (req, res) => {
     if (data.error) return res.status(401).json({ error: data.error_description || data.error });
 
     // Fetch the full user profile from our profiles table
-    const [profile] = await sbFetch(`/profiles?id=eq.${data.user.id}&select=*`);
+    let profile = {};
+    try {
+      const rows = await sbFetch(`/profiles?id=eq.${data.user.id}&select=*`);
+      if (rows && rows.length > 0) profile = rows[0];
+    } catch (_) {}
+
+    // Normalise profile fields for the frontend
+    const userOut = {
+      id:        data.user.id,
+      email:     data.user.email,
+      name:      profile.name       || data.user.user_metadata?.name       || data.user.email.split("@")[0],
+      role:      profile.role       || data.user.user_metadata?.role       || "clerk",
+      cwsAccess: profile.cws_access || data.user.user_metadata?.cwsAccess  || [],
+      machineId: profile.machine_id || data.user.user_metadata?.machineId  || null,
+      avatar:    profile.avatar     || data.user.user_metadata?.avatar     || data.user.email.slice(0,2).toUpperCase(),
+      active:    profile.active     !== false,
+    };
+
     res.json({
       token:         data.access_token,
       refresh_token: data.refresh_token,
       expires_in:    data.expires_in,
-      user:          { ...data.user, ...profile },
+      user:          userOut,
     });
   } catch (e) {
     res.status(500).json({ error: e.message || "Login failed" });
@@ -189,9 +206,18 @@ app.post("/api/auth/signup", async (req, res) => {
 // Get current user
 app.get("/api/auth/me", auth, async (req, res) => {
   try {
-    const [profile] = await sbFetch(`/profiles?id=eq.${req.user.id}&select=*`);
-    if (!profile) return res.status(404).json({ error: "Profile not found" });
-    res.json(profile);
+    const rows = await sbFetch(`/profiles?id=eq.${req.user.id}&select=*`);
+    const profile = rows && rows.length > 0 ? rows[0] : {};
+    res.json({
+      id:        req.user.id,
+      email:     req.user.email,
+      name:      profile.name       || req.user.email.split("@")[0],
+      role:      profile.role       || req.user.role || "clerk",
+      cwsAccess: profile.cws_access || [],
+      machineId: profile.machine_id || null,
+      avatar:    profile.avatar     || req.user.email.slice(0,2).toUpperCase(),
+      active:    profile.active     !== false,
+    });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
@@ -245,21 +271,40 @@ app.post("/api/users", auth, requireRoles("sudo","admin","md"), async (req, res)
 app.put("/api/users/:id", auth, async (req, res) => {
   if (req.user.id !== req.params.id && !["sudo","admin","md"].includes(req.user.role))
     return res.status(403).json({ error: "Forbidden" });
-  const { name, role, cwsAccess, machineId, avatar, active } = req.body || {};
+
+  const { name, role, cwsAccess, machineId, avatar, active, email } = req.body || {};
+  const paramId = req.params.id;
+
   try {
-    await sbFetch(`/profiles?id=eq.${req.params.id}`, {
-      method: "PATCH",
-      body: JSON.stringify({
-        ...(name       != null && { name }),
-        ...(role       != null && { role }),
-        ...(cwsAccess  != null && { cws_access: cwsAccess }),
-        ...(machineId  != null && { machine_id: machineId }),
-        ...(avatar     != null && { avatar }),
-        ...(active     != null && { active }),
-        updated_at: new Date().toISOString(),
-      }),
-    });
-    res.json({ ok: true });
+    const payload = {
+      ...(name       != null && { name }),
+      ...(role       != null && { role }),
+      ...(cwsAccess  != null && { cws_access: cwsAccess }),
+      ...(machineId  != null && { machine_id: machineId }),
+      ...(avatar     != null && { avatar }),
+      ...(active     != null && { active }),
+      updated_at: new Date().toISOString(),
+    };
+
+    // Try by UUID first (standard Supabase id)
+    const isUUID = /^[0-9a-f-]{36}$/i.test(paramId);
+    if (isUUID) {
+      await sbFetch(`/profiles?id=eq.${paramId}`, { method: "PATCH", body: JSON.stringify(payload) });
+      return res.json({ ok: true });
+    }
+
+    // Seed user — look up by email
+    if (email) {
+      const existing = await sbFetch(`/profiles?email=eq.${encodeURIComponent(email)}&select=id`);
+      if (existing && existing.length > 0) {
+        await sbFetch(`/profiles?id=eq.${existing[0].id}`, { method: "PATCH", body: JSON.stringify(payload) });
+        return res.json({ ok: true, supabaseId: existing[0].id });
+      }
+      // Profile doesn't exist yet — create it via signup flow
+      return res.status(404).json({ error: "Profile not found — use POST /api/seed-profiles first" });
+    }
+
+    res.status(400).json({ error: "Cannot identify user — provide UUID or email" });
   } catch (e) { res.status(400).json({ error: e.message }); }
 });
 
@@ -423,6 +468,67 @@ async function logAudit(userId, action, table, recordId, payload) {
     });
   } catch {}
 }
+
+// ── Seed profiles from frontend INIT_USERS ───────────────────────────
+// Called once by the frontend to push seed users into Supabase profiles table.
+// Only sudo can call this.
+app.post("/api/seed-profiles", auth, requireRoles("sudo"), async (req, res) => {
+  const { users } = req.body || {};
+  if (!Array.isArray(users)) return res.status(400).json({ error: "users[] required" });
+  const results = [];
+  for (const u of users) {
+    try {
+      // Check if profile already exists
+      const existing = await sbFetch(`/profiles?email=eq.${encodeURIComponent(u.email)}&select=id`);
+      if (existing && existing.length > 0) {
+        // Update existing profile
+        await sbFetch(`/profiles?id=eq.${existing[0].id}`, {
+          method: "PATCH",
+          body: JSON.stringify({
+            name:       u.name,
+            role:       u.role,
+            cws_access: u.cwsAccess || [],
+            machine_id: u.machineId || null,
+            avatar:     u.avatar || u.name.slice(0,2).toUpperCase(),
+            active:     u.active !== false,
+            updated_at: new Date().toISOString(),
+          }),
+        });
+        results.push({ email: u.email, ok: true, action: "updated" });
+      } else {
+        // Create auth user + profile
+        try {
+          const authUser = await sbAuth("/admin/users", {
+            email: u.email,
+            password: u.password || "changeme123",
+            email_confirm: true,
+            user_metadata: { name: u.name, role: u.role, avatar: u.avatar || u.name.slice(0,2).toUpperCase() },
+          });
+          await sbFetch("/profiles", {
+            method: "POST",
+            body: JSON.stringify({
+              id:         authUser.id,
+              name:       u.name,
+              email:      u.email,
+              role:       u.role,
+              cws_access: u.cwsAccess || [],
+              machine_id: u.machineId || null,
+              avatar:     u.avatar || u.name.slice(0,2).toUpperCase(),
+              active:     true,
+            }),
+          });
+          results.push({ email: u.email, ok: true, action: "created" });
+        } catch (authErr) {
+          // Auth user may already exist — try just upserting profile
+          results.push({ email: u.email, ok: false, error: authErr.message });
+        }
+      }
+    } catch (e) {
+      results.push({ email: u.email, ok: false, error: e.message });
+    }
+  }
+  res.json({ ok: true, results });
+});
 
 // ── Health ────────────────────────────────────────────────────────────
 app.get("/api/health", (_, res) => res.json({ ok: true, version: "2.0.0", db: "supabase", time: new Date().toISOString() }));
