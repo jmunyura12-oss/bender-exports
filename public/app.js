@@ -328,6 +328,19 @@ const selS = () => ({
   cursor: "pointer", transition: "border-color .15s",
   appearance: "none", WebkitAppearance: "none",
 });
+// ── Service Worker bridge ────────────────────────────────────────────
+// Sends the current auth token (and flush signal) to the service worker
+// so it can authorise background syncs while the tab is closed/inactive.
+function swNotify(type, extra = {}) {
+  try {
+    const sw = navigator.serviceWorker?.controller;
+    if (!sw) return;
+    sw.postMessage({ type, ...extra });
+  } catch (e) {
+    console.warn("[Bender] swNotify failed:", e.message);
+  }
+}
+
 // Global authenticated fetch — attaches Bearer token from localStorage automatically
 const apiFetch = async (path, opts = {}) => {
   const token = localStorage.getItem("bender_token");
@@ -353,6 +366,8 @@ const apiFetch = async (path, opts = {}) => {
           const rfData = await rfRes.json();
           localStorage.setItem("bender_token", rfData.token);
           if (rfData.refresh_token) localStorage.setItem("bender_refresh", rfData.refresh_token);
+          // Keep the service worker token in sync with the refreshed token
+          swNotify("SET_TOKEN", { token: rfData.token });
           // Retry original request with new token
           return fetch(path, {
             ...opts,
@@ -468,6 +483,54 @@ function App() {
   const [system, setSystemRaw] = useState(INIT_SYSTEM);
   const [currentUser, setCurrentUser] = useState(null);
   const [online, setOnline] = useState(typeof window.__benderOnline !== 'undefined' ? window.__benderOnline : navigator.onLine);
+
+  // When the device comes back online: flush queued ops, then pull latest data
+  useEffect(() => {
+    const handleOnline = async () => {
+      setOnline(true);
+      await flushOfflineQueue();
+      // After flushing, pull fresh data so we see changes from other machines
+      try {
+        const token = localStorage.getItem("bender_token");
+        if (!token) return;
+        const res = await apiFetch("/api/pull?since=1970-01-01T00:00:00Z");
+        if (res.ok) {
+          const { delta } = await res.json();
+          if (delta) {
+            const setters = {
+              cherry: setCherryRaw, cashbook: setCashbookRaw,
+              bank_transactions: setBankTxRaw, expenses: setExpensesRaw,
+              debts: setDebtsRaw, stock: setStockRaw,
+              fund_requests: setFundRequestsRaw, warehouse_stock: setWarehouseStockRaw,
+              projects: setProjectsRaw, project_costs: setProjectCostsRaw,
+              contractors: setContractorsRaw, machines: setMachinesRaw,
+              assistants: setAssistantsRaw, tasks: setTasksRaw,
+              mach_tx: setMachTxRaw, driver_logs: setDriverLogsRaw,
+              leaves: setLeavesRaw, seasons: setSeasonsRaw,
+              station_seasons: setStationSeasonsRaw, farmers: setFarmersRaw,
+              cws: setCwsListRaw, milestones: setMilestonesRaw,
+            };
+            for (const [table, rows] of Object.entries(delta)) {
+              if (!rows?.length) continue;
+              const setter = setters[table];
+              if (setter) setter(prev => {
+                const map = Object.fromEntries((prev||[]).map(r => [r.id, r]));
+                rows.forEach(r => { map[r.id] = { ...map[r.id], ...r }; });
+                return Object.values(map);
+              });
+            }
+          }
+        }
+      } catch (_) {}
+    };
+    const handleOffline = () => setOnline(false);
+    window.addEventListener("online",  handleOnline);
+    window.addEventListener("offline", handleOffline);
+    return () => {
+      window.removeEventListener("online",  handleOnline);
+      window.removeEventListener("offline", handleOffline);
+    };
+  }, []);
   const [notifications, setNotifications] = useState([
     { id: "n1", text: "Fund request from Nyungwe CWS awaiting verification", type: "fund", read: false, time: "08:30" },
     { id: "n2", text: "Fund request from Nyarubaka CWS awaiting verification", type: "fund", read: false, time: "08:45" },
@@ -502,11 +565,48 @@ function App() {
     system:    "system",
   };
 
+  // ── Offline queue helpers ────────────────────────────────────────────
+  // When a sync fails (offline), ops are queued in localStorage.
+  // When the device comes back online, the queue is flushed first,
+  // THEN a fresh pull from Supabase merges the latest server state.
+  const OFFLINE_QUEUE_KEY = "bender_offline_ops";
+
+  const enqueueOp = (op) => {
+    try {
+      const q = JSON.parse(localStorage.getItem(OFFLINE_QUEUE_KEY) || "[]");
+      // Upsert: replace any existing op for the same table+id so we don't
+      // send redundant older versions of the same record.
+      const idx = q.findIndex(x => x.table === op.table && x.id === op.id);
+      if (idx >= 0) q[idx] = op; else q.push(op);
+      localStorage.setItem(OFFLINE_QUEUE_KEY, JSON.stringify(q));
+    } catch (e) { console.warn("[Bender] enqueueOp failed:", e); }
+  };
+
+  const flushOfflineQueue = async () => {
+    const token = localStorage.getItem("bender_token");
+    if (!token) return;
+    try {
+      const q = JSON.parse(localStorage.getItem(OFFLINE_QUEUE_KEY) || "[]");
+      if (!q.length) return;
+      console.log(`[Bender] Flushing ${q.length} offline op(s) to server...`);
+      const res = await apiFetch("/api/sync", {
+        method: "POST",
+        body: JSON.stringify({ operations: q }),
+      });
+      if (res.ok) {
+        localStorage.removeItem(OFFLINE_QUEUE_KEY);
+        console.log("[Bender] Offline queue flushed successfully.");
+      }
+    } catch (e) {
+      console.warn("[Bender] Queue flush failed (still offline?):", e.message);
+    }
+  };
+
   // Sync a list of records to Supabase via /api/sync
   const syncToServer = async (table, records) => {
     try {
       const token = localStorage.getItem("bender_token");
-      if (!token) return; // not logged in via Supabase yet — localStorage only
+      if (!token) return; // not logged in — localStorage only
       const serverTable = TABLE_MAP[table] || table;
       if (serverTable === "users" || serverTable === "system") return; // handled separately
       const ops = (Array.isArray(records) ? records : [records]).map(r => ({
@@ -515,12 +615,18 @@ function App() {
         id:     r.id,
         data:   r,
       }));
-      await apiFetch("/api/sync", {
+      const res = await apiFetch("/api/sync", {
         method: "POST",
         body: JSON.stringify({ operations: ops }),
       });
+      if (!res.ok) throw new Error("sync HTTP " + res.status);
     } catch (e) {
-      console.warn("[Bender] syncToServer failed:", e.message);
+      // Device is offline or server unreachable — queue for later
+      console.warn("[Bender] Sync failed, queuing offline:", e.message);
+      const serverTable = TABLE_MAP[table] || table;
+      (Array.isArray(records) ? records : [records]).forEach(r =>
+        enqueueOp({ table: serverTable, method: "POST", id: r.id, data: r })
+      );
     }
   };
 
@@ -634,12 +740,16 @@ function App() {
       }
       setDbReady(true);
 
-      // Pull latest data from server in background
-      // This syncs any changes made on other devices
+      // ── Boot sync sequence ───────────────────────────────────────────
+      // 1. Flush any ops saved while offline (they must reach the server first)
+      // 2. Then pull ALL data from server so we get changes from other machines
+      // This order is critical: pull-before-flush would overwrite offline changes.
       try {
         const token = localStorage.getItem("bender_token");
         if (token) {
-          const lastSync = localStorage.getItem("last_sync") || "1970-01-01T00:00:00Z";
+          await flushOfflineQueue(); // step 1: push offline changes up first
+          localStorage.removeItem("last_sync"); // step 2: force full pull
+          const lastSync = "1970-01-01T00:00:00Z";
           const res = await apiFetch(`/api/pull?since=${encodeURIComponent(lastSync)}`);
           if (res.ok) {
             const { delta } = await res.json();
@@ -717,7 +827,7 @@ function App() {
       .on("postgres_changes", { event: "*", schema: "public" }, () => {
         const token = localStorage.getItem("bender_token");
         if (!token) return;
-        const since = localStorage.getItem("last_sync") || "1970-01-01T00:00:00Z";
+        const since = "1970-01-01T00:00:00Z"; // always full pull so no device misses cross-machine changes
         apiFetch(`/api/pull?since=${encodeURIComponent(since)}`)
           .then(r => r.ok ? r.json() : null)
           .then(d => {
@@ -753,6 +863,9 @@ function App() {
         localStorage.setItem("bender_token", data.token);
         if (data.refresh_token) localStorage.setItem("bender_refresh", data.refresh_token);
         window.dispatchEvent(new CustomEvent("bender:token", { detail: data.token }));
+        // Tell the service worker the new token so it can authorise background syncs
+        swNotify("SET_TOKEN", { token: data.token });
+        swNotify("FLUSH_QUEUE");
 
         // Fetch full profile to get role/cwsAccess from profiles table
         let profile = data.user || {};
@@ -841,6 +954,8 @@ function App() {
   }} system={system} /></Ctx.Provider>;
   return <Ctx.Provider value={ctx}><style>{GS}</style><Shell onLogout={() => {
     localStorage.removeItem("bender_token");
+    // Clear the token from the service worker so it stops background syncs
+    swNotify("SET_TOKEN", { token: null });
     setCurrentUser(null);
     setPage({ view: "home", sub: null });
   }} /></Ctx.Provider>;
