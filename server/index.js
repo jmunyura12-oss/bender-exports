@@ -131,12 +131,17 @@ app.post("/api/auth/login", async (req, res) => {
   const { email, password } = req.body || {};
   if (!email || !password)
     return res.status(400).json({ error: "Email and password required" });
+  if (!ANON_KEY)
+    return res.status(500).json({ error: "Server misconfiguration: SUPABASE_ANON_KEY not set" });
   try {
-    const data = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
+    console.log("[Login] Attempting:", email, "| URL:", SUPABASE_URL);
+    const authRes = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
       method: "POST",
       headers: { "apikey": ANON_KEY, "Content-Type": "application/json" },
       body: JSON.stringify({ email, password }),
-    }).then(r => r.json());
+    });
+    const data = await authRes.json();
+    console.log("[Login] Supabase status:", authRes.status, "| body:", JSON.stringify(data).slice(0, 300));
 
     if (data.error) return res.status(401).json({ error: data.error_description || data.error });
 
