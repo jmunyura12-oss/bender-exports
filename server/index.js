@@ -76,6 +76,7 @@ async function sbAuth(path, body, method = "POST") {
 
 // ── Express ───────────────────────────────────────────────────────────
 const app = express();
+app.set("trust proxy", 1); // Required for Railway / any reverse proxy
 if (compression) app.use(compression());
 if (helmet)      app.use(helmet({ contentSecurityPolicy: false }));
 app.use(cors({ origin: "*", credentials: true }));
