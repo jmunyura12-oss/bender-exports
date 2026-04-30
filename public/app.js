@@ -309,6 +309,7 @@ const TABLES = [
   "users",
   "system"
 ];
+const SEED_VERSION = "bender-v1"; // bump this only to force a one-time localStorage wipe
 const DB = {
   async load(table) {
     try {
@@ -677,7 +678,7 @@ function App() {
                 warehouse_stock:  setWarehouseStockRaw,
                 projects:         setProjectsRaw,
                 project_costs:    setProjectCostsRaw,
-                milestones:       setSeasonsRaw,
+                milestones:       setMilestonesRaw,
                 contractors:      setContractorsRaw,
                 machines:         setMachinesRaw,
                 assistants:       setAssistantsRaw,
@@ -720,6 +721,21 @@ function App() {
               DB.save("users", merged);
             }
           }
+          // Pull system config (branding, heroImageUrl, businessModels, etc.)
+          try {
+            const sysRes = await apiFetch("/api/system");
+            if (sysRes.ok) {
+              const cfg = await sysRes.json();
+              if (cfg && typeof cfg === "object" && Object.keys(cfg).length > 0) {
+                const merged = { ...INIT_SYSTEM, ...cfg,
+                  labels: { ...INIT_SYSTEM.labels, ...(cfg.labels || {}) },
+                  businessModels: cfg.businessModels || INIT_SYSTEM.businessModels,
+                };
+                setSystemRaw(merged);
+                DB.save("system", merged);
+              }
+            }
+          } catch (_) {}
         }
       } catch (_) { /* server unreachable — use local data */ }
     }
