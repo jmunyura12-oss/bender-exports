@@ -167,6 +167,7 @@ const hasAccess = (u, sec) => {
     construction: ["sudo", "md", "admin", "hq_finance", "hq_accountant", "hq_ops"],
     warehouse: ["sudo", "md", "admin", "hq_finance", "hq_accountant", "hq_ops", "station_manager"],
     users: ["sudo", "md"],
+    import: ["sudo", "md", "admin", "hq_finance", "hq_accountant", "hq_ops"],
     system: ["sudo"],
     reports: ["sudo", "md", "admin", "hq_finance", "hq_accountant", "hq_ops", "station_manager", "cashier"],
     driver_log: ["driver"],
@@ -223,6 +224,17 @@ function swNotify(type, extra = {}) {
     console.warn("[Bender] swNotify failed:", e.message);
   }
 }
+
+// ── UUID generator ────────────────────────────────────────────────────
+// Uses the browser's crypto API to generate RFC-4122 v4 UUIDs.
+// Supabase requires proper UUIDs for all primary keys — Date.now() strings
+// like "s1234567" are rejected by UUID columns and silently fail to save.
+const uid = () => typeof crypto !== "undefined" && crypto.randomUUID
+  ? crypto.randomUUID()
+  : "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
+      const r = Math.random() * 16 | 0;
+      return (c === "x" ? r : (r & 0x3 | 0x8)).toString(16);
+    });
 
 // Global authenticated fetch — attaches Bearer token from localStorage automatically
 const apiFetch = async (path, opts = {}) => {
@@ -472,11 +484,30 @@ function App() {
       const q = JSON.parse(localStorage.getItem(OFFLINE_QUEUE_KEY) || "[]");
       if (!q.length) return;
       console.log(`[Bender] Flushing ${q.length} offline op(s) to server...`);
-      const res = await apiFetch("/api/sync", {
-        method: "POST",
-        body: JSON.stringify({ operations: q }),
-      });
-      if (res.ok) {
+
+      // Split: system ops use PUT /api/system, everything else uses /api/sync
+      const systemOp = q.find(op => op.table === "system");
+      const otherOps = q.filter(op => op.table !== "system");
+
+      let allOk = true;
+
+      if (systemOp) {
+        const res = await apiFetch("/api/system", {
+          method: "PUT",
+          body: JSON.stringify(systemOp.data),
+        });
+        if (!res.ok) allOk = false;
+      }
+
+      if (otherOps.length) {
+        const res = await apiFetch("/api/sync", {
+          method: "POST",
+          body: JSON.stringify({ operations: otherOps }),
+        });
+        if (!res.ok) allOk = false;
+      }
+
+      if (allOk) {
         localStorage.removeItem(OFFLINE_QUEUE_KEY);
         console.log("[Bender] Offline queue flushed successfully.");
       }
@@ -491,7 +522,22 @@ function App() {
       const token = localStorage.getItem("bender_token");
       if (!token) return; // not logged in — localStorage only
       const serverTable = TABLE_MAP[table] || table;
-      if (serverTable === "users" || serverTable === "system") return; // handled separately
+
+      // ── system: uses its own PUT /api/system endpoint (key-value store) ──
+      if (serverTable === "system") {
+        const payload = Array.isArray(records) ? records[0] : records;
+        const res = await apiFetch("/api/system", {
+          method: "PUT",
+          body: JSON.stringify(payload),
+        });
+        if (!res.ok) throw new Error("system sync HTTP " + res.status);
+        return;
+      }
+
+      // ── users: handled by dedicated /api/users endpoints ──────────────
+      if (serverTable === "users") return;
+
+      // ── everything else: batch sync via /api/sync ──────────────────────
       const ops = (Array.isArray(records) ? records : [records]).map(r => ({
         table:  serverTable,
         method: "POST", // upsert
@@ -507,9 +553,15 @@ function App() {
       // Device is offline or server unreachable — queue for later
       console.warn("[Bender] Sync failed, queuing offline:", e.message);
       const serverTable = TABLE_MAP[table] || table;
-      (Array.isArray(records) ? records : [records]).forEach(r =>
-        enqueueOp({ table: serverTable, method: "POST", id: r.id, data: r })
-      );
+      if (serverTable === "system") {
+        // system is a single object — store it under a fixed key
+        const payload = Array.isArray(records) ? records[0] : records;
+        enqueueOp({ table: "system", method: "PUT", id: "__system__", data: payload });
+      } else if (serverTable !== "users") {
+        (Array.isArray(records) ? records : [records]).forEach(r =>
+          enqueueOp({ table: serverTable, method: "POST", id: r.id, data: r })
+        );
+      }
     }
   };
 
@@ -668,19 +720,6 @@ function App() {
               DB.save("users", merged);
             }
           }
-          // Pull system config (branding, heroImageUrl, businessModels, etc.)
-          const sysRes = await apiFetch("/api/system");
-          if (sysRes.ok) {
-            const cfg = await sysRes.json();
-            if (cfg && typeof cfg === "object" && Object.keys(cfg).length > 0) {
-              const merged = { ...INIT_SYSTEM, ...cfg,
-                labels: { ...INIT_SYSTEM.labels, ...(cfg.labels || {}) },
-                businessModels: cfg.businessModels || INIT_SYSTEM.businessModels,
-              };
-              setSystemRaw(merged);
-              DB.save("system", merged);
-            }
-          }
         }
       } catch (_) { /* server unreachable — use local data */ }
     }
@@ -774,7 +813,7 @@ function App() {
 
     return null;
   };
-  const ctx = { users, setUsers, cwsList, setCwsList, farmers: farmers2, setFarmers, seasons, setSeasons, stationSeasons, setStationSeasons, cherry, setCherry, cashbook, setCashbook, bankTx, setBankTx, expenses, setExpenses, debts, setDebts, stock, setStock, fundRequests, setFundRequests, warehouseStock, setWarehouseStock, projects, setProjects, projectCosts, setProjectCosts, milestones, setMilestones, contractors, setContractors, machines, setMachines, assistants, setAssistants, tasks, setTasks, machTx, setMachTx, driverLogs, setDriverLogs, leaves, setLeaves, pending, setPending, system, setSystem, currentUser, online, setOnline, notifications, setNotifications, addNote, page, setPage, dbReady };
+  const ctx = { users, setUsers, cwsList, setCwsList, syncToServer, farmers: farmers2, setFarmers, seasons, setSeasons, stationSeasons, setStationSeasons, cherry, setCherry, cashbook, setCashbook, bankTx, setBankTx, expenses, setExpenses, debts, setDebts, stock, setStock, fundRequests, setFundRequests, warehouseStock, setWarehouseStock, projects, setProjects, projectCosts, setProjectCosts, milestones, setMilestones, contractors, setContractors, machines, setMachines, assistants, setAssistants, tasks, setTasks, machTx, setMachTx, driverLogs, setDriverLogs, leaves, setLeaves, pending, setPending, system, setSystem, currentUser, online, setOnline, notifications, setNotifications, addNote, page, setPage, dbReady };
   if (!dbReady) return <div style={{ minHeight: "100vh", background: C.bg, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 16 }}>
       <div style={{ fontFamily: "'Inter',sans-serif", fontSize: 26, letterSpacing: '-0.5px', fontWeight: 700, color: C.gold }}>Bender Exports</div>
       <div style={{ fontSize: 13, color: C.textMuted }}>Loading database...</div>
@@ -1153,7 +1192,7 @@ function LoginPage({ onLogin, system }) {
         <div style={{ position: "absolute", inset: 0, background: "linear-gradient(135deg,rgba(8,14,10,.88) 0%,rgba(8,14,10,.35) 55%,rgba(8,14,10,.92) 100%)" }} />
         <div style={{ position: "absolute", height: "100%", width: "100%", display: "flex", flexDirection: "column", justifyContent: "space-between", padding: "40px 52px" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 14, position: "relative", zIndex: 1 }}>
-            <div style={{ width: 48, height: 48, borderRadius: 12, background: `${C.gold}22`, border: `1px solid ${C.gold}40`, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Inter',sans-serif", fontSize: 20, letterSpacing: '-0.3px', fontWeight: 700, color: C.gold }}>BE</div>
+            <img src="/icons/logo_white.png" alt="Bender Exports" style={{ width: 48, height: 48, objectFit: "contain", flexShrink: 0, filter: "brightness(0) invert(1)" }} />
             <div><div style={{ fontFamily: "'Cormorant',serif", fontSize: 20, fontWeight: 700, color: C.text }}>{system.companyName}</div><div style={{ fontSize: 11, color: C.textMuted }}>Integrated Operations System</div></div>
           </div>
           <div style={{ position: "relative", zIndex: 1, animation: "fadeUp .8s ease both" }}>
@@ -1169,7 +1208,7 @@ function LoginPage({ onLogin, system }) {
         <div style={{ animation: "fadeUp .5s ease both" }}>
           {/* Mobile logo */}
           <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 28 }} className="show-mobile">
-            <div style={{ width: 40, height: 40, borderRadius: 10, background: `${C.gold}22`, border: `1px solid ${C.gold}40`, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Inter',sans-serif", fontSize: 17, letterSpacing: '-0.2px', fontWeight: 700, color: C.gold }}>BE</div>
+            <img src="/icons/logo_white.png" alt="Bender Exports" style={{ width: 40, height: 40, objectFit: "contain", flexShrink: 0, filter: "brightness(0) invert(1)" }} />
             <div><div style={{ fontFamily: "'Inter',sans-serif", fontSize: 17, letterSpacing: '-0.2px', fontWeight: 700, color: C.text }}>{system.companyName}</div><div style={{ fontSize: 10, color: C.textMuted }}>Integrated Operations System</div></div>
           </div>
           <div style={{ fontFamily: "'Cormorant',serif", fontSize: 30, fontWeight: 700, color: C.text, marginBottom: 4 }}>Welcome back</div>
@@ -1210,6 +1249,7 @@ function Shell({ onLogout }) {
     { id: "reports",      label: "Reports",                                            icon: "📊", show: hasAccess(u, "reports") },
     { id: "users",        label: "Users",                                              icon: "👥", show: hasAccess(u, "users") },
     { id: "system",       label: "System",                                             icon: "⚙️", show: hasAccess(u, "system") },
+    { id: "import",       label: "Import Data",                                        icon: "📥", show: hasAccess(u, "import") },
   ].filter(n => n.show !== false);
 
   const closeSidebar = () => setSidebarOpen(false);
@@ -1344,7 +1384,7 @@ function Shell({ onLogout }) {
 function PageRouter() {
   const { page, currentUser: u } = useApp();
   if (u.role === "driver") return <DriverHome />;
-  const views = { home: <HomePage />, coffee: <CoffeePage />, machinery: <MachineryPage />, construction: <ConstructionPage />, warehouse: <WarehousePage />, reports: <ReportsPage />, users: <UsersPage />, system: <SystemPage /> };
+  const views = { home: <HomePage />, coffee: <CoffeePage />, machinery: <MachineryPage />, construction: <ConstructionPage />, warehouse: <WarehousePage />, reports: <ReportsPage />, users: <UsersPage />, system: <SystemPage />, import: <ImportPage /> };
   return <div style={{ animation: "fadeUp .3s ease both" }}>{views[page.view] || <HomePage />}</div>;
 }
 function HomePage() {
@@ -1491,6 +1531,7 @@ function HomePage() {
     color={C.coffee}
     colorLight={C.coffeeLight}
     colorBg={C.coffeeBg}
+    image={(system?.businessModels||[]).find(m=>m.id==="coffee")?.image||""}
     stats={[{ l: "Cherry Purchased", v: fmtKg(totalCherryKg) }, { l: "Farmer Payments", v: fmtRWF(totalCherryPaid) }, { l: "Active Stations", v: cwsList.length }]}
   />
         <BizCard
@@ -1500,6 +1541,7 @@ function HomePage() {
     color={C.machinery}
     colorLight={C.machineryLight}
     colorBg={C.machineryBg}
+    image={(system?.businessModels||[]).find(m=>m.id==="machinery")?.image||""}
     stats={[{ l: "Revenue", v: fmtRWF(totalMachIncome) }, { l: "Machines", v: (machines||[]).length }, { l: "Active Tasks", v: (tasks||[]).length }]}
   />
         <BizCard
@@ -1509,6 +1551,7 @@ function HomePage() {
     color={C.construction}
     colorLight={C.constructionLight}
     colorBg={C.constructionBg}
+    image={(system?.businessModels||[]).find(m=>m.id==="construction")?.image||""}
     stats={[{ l: "Projects", v: "0" }, { l: "Status", v: "Upcoming" }, { l: "Revenue", v: "0 RWF" }]}
   />
       </div>
@@ -1531,23 +1574,71 @@ function HomePage() {
       </div>
     </div>;
 }
-function BizCard({ id, label, icon, color, colorLight, colorBg, stats = [] }) {
+/* ── ImagePicker ── reusable image selector (file upload + URL) ────── */
+function ImagePicker({ value, onChange, height = 90, label = "Image" }) {
+  const id = "img-pick-" + Math.random().toString(36).slice(2);
+  return <div>
+    <div style={{ fontSize: 10, fontWeight: 600, color: C.textMuted, textTransform: "uppercase", letterSpacing: "0.7px", marginBottom: 6 }}>{label}</div>
+    {/* Preview */}
+    {value
+      ? <div style={{ position: "relative", borderRadius: 8, overflow: "hidden", height, marginBottom: 7, border: `1px solid ${C.border}` }}>
+          <img src={value} alt="preview" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+          <button onClick={() => onChange("")} style={{ position: "absolute", top: 5, right: 5, background: "rgba(0,0,0,.75)", border: "none", borderRadius: 5, color: "#fff", fontSize: 10, padding: "3px 7px", cursor: "pointer", fontWeight: 700 }}>✕</button>
+        </div>
+      : <div style={{ height, border: `2px dashed ${C.border}`, borderRadius: 8, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 4, marginBottom: 7, color: C.textDim, fontSize: 11, cursor: "pointer" }} onClick={() => document.getElementById(id).click()}>
+          <span style={{ fontSize: 20, opacity: .35 }}>🖼</span>
+          Click to add image
+        </div>}
+    {/* File input */}
+    <input type="file" id={id} accept="image/*" style={{ display: "none" }} onChange={(e) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      if (file.size > 5 * 1024 * 1024) { alert("Image must be under 5 MB"); return; }
+      const reader = new FileReader();
+      reader.onload = (ev) => onChange(ev.target.result);
+      reader.readAsDataURL(file);
+      e.target.value = "";
+    }} />
+    {/* Buttons row */}
+    <div style={{ display: "flex", gap: 6 }}>
+      <button onClick={() => document.getElementById(id).click()} style={{ ...BtnS(C.gold, true), flex: 1, justifyContent: "center", fontSize: 11, padding: "6px 10px" }}>📁 Upload</button>
+      <input
+        type="url"
+        placeholder="or paste URL…"
+        value={value?.startsWith("data:") ? "" : (value || "")}
+        onChange={(e) => onChange(e.target.value)}
+        style={{ flex: 2, padding: "6px 10px", background: C.bgDeep, border: `1.5px solid ${C.border}`, borderRadius: 8, color: C.text, fontSize: 11, outline: "none" }}
+        onFocus={e => { e.target.style.borderColor = C.gold; }}
+        onBlur={e => { e.target.style.borderColor = C.border; }}
+      />
+    </div>
+  </div>;
+}
+
+function BizCard({ id, label, icon, color, colorLight, colorBg, image, stats = [] }) {
   const { setPage } = useApp();
-  return <div onClick={() => setPage({ view: id, sub: null })} style={{ background: `linear-gradient(145deg,${colorBg},${C.bgCard})`, border: `1px solid ${color}28`, borderRadius: 13, padding: "18px", cursor: "pointer", transition: "all .2s", position: "relative", overflow: "hidden" }} onMouseEnter={(e) => {
+  return <div onClick={() => setPage({ view: id, sub: null })} style={{ background: `linear-gradient(145deg,${colorBg},${C.bgCard})`, border: `1px solid ${color}28`, borderRadius: 13, cursor: "pointer", transition: "all .2s", position: "relative", overflow: "hidden" }} onMouseEnter={(e) => {
     e.currentTarget.style.borderColor = `${color}55`;
     e.currentTarget.style.transform = "translateY(-3px)";
   }} onMouseLeave={(e) => {
     e.currentTarget.style.borderColor = `${color}28`;
     e.currentTarget.style.transform = "translateY(0)";
   }}>
-      <div style={{ position: "absolute", top: -15, right: -15, fontSize: 55, opacity: 0.05 }}>{icon}</div>
-      <div style={{ fontSize: 24, marginBottom: 8 }}>{icon}</div>
-      <div style={{ fontFamily: "'Inter',sans-serif", fontSize: 16, letterSpacing: '-0.2px', fontWeight: 700, color: colorLight, marginBottom: 10 }}>{label}</div>
-      {stats.map((s) => <div key={s.l} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 5 }}>
-          <span style={{ fontSize: 10, color: C.textDim }}>{s.l}</span>
-          <span style={{ fontSize: 12, fontWeight: 700, color: C.text }}>{s.v}</span>
-        </div>)}
-      <div style={{ marginTop: 10, fontSize: 11, color, fontWeight: 700 }}>Open {label} →</div>
+      {/* Optional photo header */}
+      {image && <div style={{ height: 72, position: "relative" }}>
+        <img src={image} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+        <div style={{ position: "absolute", inset: 0, background: `linear-gradient(to bottom, transparent 30%, ${colorBg}DD)` }} />
+      </div>}
+      <div style={{ padding: "14px 16px", position: "relative" }}>
+        {!image && <div style={{ position: "absolute", top: -15, right: -15, fontSize: 55, opacity: 0.05 }}>{icon}</div>}
+        <div style={{ fontSize: 24, marginBottom: 8 }}>{icon}</div>
+        <div style={{ fontFamily: "'Inter',sans-serif", fontSize: 16, letterSpacing: '-0.2px', fontWeight: 700, color: colorLight, marginBottom: 10 }}>{label}</div>
+        {stats.map((s) => <div key={s.l} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 5 }}>
+            <span style={{ fontSize: 10, color: C.textDim }}>{s.l}</span>
+            <span style={{ fontSize: 12, fontWeight: 700, color: C.text }}>{s.v}</span>
+          </div>)}
+        <div style={{ marginTop: 10, fontSize: 11, color, fontWeight: 700 }}>Open {label} →</div>
+      </div>
     </div>;
 }
 function CoffeePage() {
@@ -1649,7 +1740,7 @@ function SeasonsPage({ onBack }) {
       addNote("Close the current active season before opening a new one", "warning");
       return;
     }
-    setSeasons((p) => [{ id: `s${Date.now()}`, name: form.name, startDate: form.startDate, endDate: form.endDate || null, rateStandard: +form.rateStandard, rateFlotant: +form.rateFlotant, status: "active", createdBy: u.id, createdAt: today(), closedAt: null, notes: form.notes }, ...p]);
+    setSeasons((p) => [{ id: uid(), name: form.name, startDate: form.startDate, endDate: form.endDate || null, rateStandard: +form.rateStandard, rateFlotant: +form.rateFlotant, status: "active", createdBy: u.id, createdAt: today(), closedAt: null, notes: form.notes }, ...p]);
     setShowForm(false);
     setForm({ name: "", startDate: "", endDate: "", rateStandard: "155", rateFlotant: "80", notes: "" });
     addNote("New season created and opened", "success");
@@ -1662,7 +1753,7 @@ function SeasonsPage({ onBack }) {
   const enrollStation = () => {
     if (!enrollForm.cwsId || !activeSeason) return;
     if (stationSeasons.find((ss) => ss.cwsId === enrollForm.cwsId && ss.seasonId === activeSeason.id)) return;
-    setStationSeasons((p) => [...p, { id: `ss${Date.now()}`, seasonId: activeSeason.id, cwsId: enrollForm.cwsId, startDate: enrollForm.startDate, endDate: null, status: "active" }]);
+    setStationSeasons((p) => [...p, { id: uid(), seasonId: activeSeason.id, cwsId: enrollForm.cwsId, startDate: enrollForm.startDate, endDate: null, status: "active" }]);
     setShowEnrollForm(null);
     addNote(`${cwsList.find((c) => c.id === enrollForm.cwsId)?.name} enrolled in season`, "success");
   };
@@ -1757,7 +1848,7 @@ function CWSDetailPage({ cwsId, onBack }) {
   const [newFarmerForm, setNewFarmerForm] = useState({ name: "", farmerId: "", group: "", phone: "" });
   const saveInlineFarmer = () => {
     if (!newFarmerForm.name) return null;
-    const newId = `f${Date.now()}`;
+    const newId = uid();
     const newFarmer = { ...newFarmerForm, id: newId, cwsId, balance: 0, createdAt: today(), active: true };
     setFarmers((p) => [...p, newFarmer]);
     setCherryForm((p) => ({ ...p, farmerId: newId }));
@@ -1798,7 +1889,7 @@ function CWSDetailPage({ cwsId, onBack }) {
   const cherryCalc = calcCherry(cherryForm);
   const saveFarmer = () => {
     if (!farmerForm.name) return;
-    setFarmers((p) => [...p, { ...farmerForm, id: `f${Date.now()}`, cwsId, balance: 0, createdAt: today(), active: true }]);
+    setFarmers((p) => [...p, { ...farmerForm, id: uid(), cwsId, balance: 0, createdAt: today(), active: true }]);
     setShowFarmerForm(false);
     setFarmerForm({ name: "", farmerId: "", group: "", phone: "" });
     addNote(`Farmer ${farmerForm.name} registered`, "success");
@@ -1810,7 +1901,7 @@ function CWSDetailPage({ cwsId, onBack }) {
       return;
     }
     const calc = calcCherry(cherryForm);
-    const rec = { ...cherryForm, id: `ch${Date.now()}`, cwsId, ...calc, standardKg: +cherryForm.standardKg || 0, flotantKg: +cherryForm.flotantKg || 0, totalKg: calc.totalKg, rateStandard: +cherryForm.rateStandard || 0, rateFlotant: +cherryForm.rateFlotant || 0, paymentMethod: null, status: "pending", by: u.id, paidBy: null, paidAt: null, notes: cherryForm.notes || "" };
+    const rec = { ...cherryForm, id: uid(), cwsId, ...calc, standardKg: +cherryForm.standardKg || 0, flotantKg: +cherryForm.flotantKg || 0, totalKg: calc.totalKg, rateStandard: +cherryForm.rateStandard || 0, rateFlotant: +cherryForm.rateFlotant || 0, paymentMethod: null, status: "pending", by: u.id, paidBy: null, paidAt: null, notes: cherryForm.notes || "" };
     setCherry((p) => [rec, ...p]);
     setShowCherryForm(false);
     setCherryForm({ date: today(), farmerId: "", gnrNumber: "", standardKg: "", flotantKg: "", rateStandard: "155", rateFlotant: "80", notes: "" });
@@ -1823,7 +1914,7 @@ function CWSDetailPage({ cwsId, onBack }) {
     const newStatus = action === "paid" ? "paid" : "not_paid";
     setCherry((p) => p.map((c) => c.id === showPayGNR ? { ...c, status: newStatus, paymentMethod: action === "paid" ? payForm.paymentMethod : null, paidBy: u.id, paidAt: (/* @__PURE__ */ new Date()).toLocaleString(), notes: payForm.notes || c.notes || "" } : c));
     if (action === "paid") {
-      setCashbook((prev) => [{ id: `cb${Date.now()}`, cwsId, date: today(), type: "outflow", category: "Cherry Payment", description: `GNR ${gnr.gnrNumber} \u2014 ${myCwsFarmers.find((f) => f.id === gnr.farmerId)?.name || "Farmer"}`, amount: gnr.totalPaid, balance: 0, ref: gnr.gnrNumber, by: u.id }, ...prev]);
+      setCashbook((prev) => [{ id: uid(), cwsId, date: today(), type: "outflow", category: "Cherry Payment", description: `GNR ${gnr.gnrNumber} \u2014 ${myCwsFarmers.find((f) => f.id === gnr.farmerId)?.name || "Farmer"}`, amount: gnr.totalPaid, balance: 0, ref: gnr.gnrNumber, by: u.id }, ...prev]);
       addNote(`GNR ${gnr.gnrNumber} payment confirmed \u2014 ${payForm.paymentMethod?.replace(/_/g, " ")}`, "success");
     } else {
       addNote(`GNR ${gnr.gnrNumber} marked as NOT PAID \u2014 farmer debt recorded`, "warning");
@@ -1833,21 +1924,21 @@ function CWSDetailPage({ cwsId, onBack }) {
   };
   const saveCash = () => {
     if (!cashForm.amount) return;
-    setCashbook((p) => [{ ...cashForm, id: `cb${Date.now()}`, cwsId, amount: +cashForm.amount, balance: 0, by: u.id }, ...p]);
+    setCashbook((p) => [{ ...cashForm, id: uid(), cwsId, amount: +cashForm.amount, balance: 0, by: u.id }, ...p]);
     setShowCashForm(false);
     setCashForm({ date: today(), type: "inflow", category: "Fund Transfer", description: "", amount: "", ref: "" });
     addNote("Cash book entry saved", "success");
   };
   const saveExp = () => {
     if (!expForm.amount) return;
-    setExpenses((p) => [{ ...expForm, id: `ex${Date.now()}`, cwsId, amount: +expForm.amount, status: "pending", by: u.id }, ...p]);
+    setExpenses((p) => [{ ...expForm, id: uid(), cwsId, amount: +expForm.amount, status: "pending", by: u.id }, ...p]);
     setShowExpForm(false);
     setExpForm({ date: today(), category: "Wages", description: "", amount: "", exploitable: true });
     addNote("Expense recorded, pending approval", "info");
   };
   const saveDebt = () => {
     if (!debtForm.amount) return;
-    setDebts((p) => [{ ...debtForm, id: `dt${Date.now()}`, cwsId, amount: +debtForm.amount, balance: +debtForm.amount, status: "outstanding" }, ...p]);
+    setDebts((p) => [{ ...debtForm, id: uid(), cwsId, amount: +debtForm.amount, balance: +debtForm.amount, status: "outstanding" }, ...p]);
     setShowDebtForm(false);
     setDebtForm({ date: today(), type: "debt_given", party: "", description: "", amount: "" });
     addNote("Debt/liability recorded", "info");
@@ -1855,14 +1946,14 @@ function CWSDetailPage({ cwsId, onBack }) {
   const saveStock = () => {
     if (!stockForm.tonnesIn) return;
     const val = (+stockForm.tonnesIn || 0) * (+stockForm.unitCost || 0);
-    setStock((p) => [{ ...stockForm, id: `sk${Date.now()}`, cwsId, tonnesIn: +stockForm.tonnesIn, tonnesOut: +stockForm.tonnesOut || 0, tonnesBalance: +stockForm.tonnesIn - (+stockForm.tonnesOut || 0), unitCost: +stockForm.unitCost || 0, totalValue: val }, ...p]);
+    setStock((p) => [{ ...stockForm, id: uid(), cwsId, tonnesIn: +stockForm.tonnesIn, tonnesOut: +stockForm.tonnesOut || 0, tonnesBalance: +stockForm.tonnesIn - (+stockForm.tonnesOut || 0), unitCost: +stockForm.unitCost || 0, totalValue: val }, ...p]);
     setShowStockForm(false);
     setStockForm({ date: today(), description: "", grade: "Parchment", tonnesIn: "", tonnesOut: "", unitCost: "", valuationMethod: "weighted_avg" });
     addNote("Stock movement recorded", "success");
   };
   const saveFundReq = () => {
     if (!fundReqForm.amount || !fundReqForm.reason) return;
-    setFundRequests((p) => [{ id: `fr${Date.now()}`, cwsId, requestedBy: u.id, amount: +fundReqForm.amount, reason: fundReqForm.reason, status: "pending_verification", requestedAt: (/* @__PURE__ */ new Date()).toLocaleString(), verifiedBy: null, verifiedAt: null, approvedBy: null, approvedAt: null, transferMethod: null, transferRef: null, notes: "" }, ...p]);
+    setFundRequests((p) => [{ id: uid(), cwsId, requestedBy: u.id, amount: +fundReqForm.amount, reason: fundReqForm.reason, status: "pending_verification", requestedAt: (/* @__PURE__ */ new Date()).toLocaleString(), verifiedBy: null, verifiedAt: null, approvedBy: null, approvedAt: null, transferMethod: null, transferRef: null, notes: "" }, ...p]);
     setShowFundReqForm(false);
     setFundReqForm({ amount: "", reason: "" });
     addNote("Fund request submitted to HQ for verification", "info");
@@ -2507,7 +2598,7 @@ function WarehousePage() {
   };
   const send = () => {
     if (!form.fromCwsId || !form.tonnes) return;
-    setWarehouseStock((p) => [...p, { id: "wh" + Date.now(), fromCwsId: form.fromCwsId, sentBy: u.id, date: (/* @__PURE__ */ new Date()).toISOString().split("T")[0], grade: form.grade, tonnes: parseFloat(form.tonnes), lotNumber: form.lotNumber, gnrRefs: form.gnrRefs, transportDetails: form.transportDetails, status: "pending", confirmedBy: null, confirmedAt: null, notes: form.notes }]);
+    setWarehouseStock((p) => [...p, { id: uid(), fromCwsId: form.fromCwsId, sentBy: u.id, date: (/* @__PURE__ */ new Date()).toISOString().split("T")[0], grade: form.grade, tonnes: parseFloat(form.tonnes), lotNumber: form.lotNumber, gnrRefs: form.gnrRefs, transportDetails: form.transportDetails, status: "pending", confirmedBy: null, confirmedAt: null, notes: form.notes }]);
     setShowForm(false);
     setForm({ fromCwsId: "", grade: "Parchment", tonnes: "", lotNumber: "", gnrRefs: "", transportDetails: "", notes: "" });
     addNote("New shipment sent to warehouse", "warehouse");
@@ -2570,410 +2661,719 @@ function WarehousePage() {
         </Modal>}
     </div>;
 }
+
 function ReportsPage() {
-  const { cherry, expenses, cashbook, bankTx, stock, debts, cwsList, machTx, fundRequests, farmers: farmers2 } = useApp();
+  const { cherry, expenses, cashbook, bankTx, stock, debts, cwsList,
+          machTx, fundRequests, farmers: farmers2, users, seasons } = useApp();
+
+  // ── Report type & global filters ─────────────────────────────────
   const [reportType, setReportType] = useState("cherry");
   const [filterStation, setFilterStation] = useState("all");
-  const [filterFrom, setFilterFrom] = useState("");
-  const [filterTo, setFilterTo] = useState("");
-  const inRange = (date) => {
-    if (filterFrom && date < filterFrom) return false;
-    if (filterTo && date > filterTo) return false;
-    return true;
-  };
-  const inStation = (cwsId) => filterStation === "all" || cwsId === filterStation;
-  const fCherry = cherry.filter((c) => inStation(c.cwsId) && inRange(c.date));
-  const fExpenses = expenses.filter((e) => inStation(e.cwsId) && inRange(e.date));
-  const fCashbook = cashbook.filter((c) => inStation(c.cwsId) && inRange(c.date));
-  const fBank = bankTx.filter((b) => inStation(b.cwsId) && inRange(b.date));
-  const fDebts = debts.filter((d) => inStation(d.cwsId));
-  const fStock = stock.filter((s) => inStation(s.cwsId) && inRange(s.date));
-  const fFR = fundRequests.filter((f) => inStation(f.cwsId));
-  const totalCherryKg = fCherry.reduce((s, c) => s + (+c.totalKg || 0), 0);
-  const totalPaid = fCherry.reduce((s, c) => s + (+c.totalPaid || 0), 0);
-  const totalExp = fExpenses.filter((e) => e.status === "approved").reduce((s, e) => s + (+e.amount || 0), 0);
-  const totalMachIncome = machTx.filter((t) => t.type === "income").reduce((s, t) => s + (+t.amount || 0), 0);
-  const totalStock = fStock.reduce((s, sk) => s + (+sk.totalValue || 0), 0);
-  const totalDebts = fDebts.reduce((s, d) => s + (+d.balance || 0), 0);
-  const expByCat = EXPENSE_CATS.map((cat) => ({ name: cat, value: fExpenses.filter((e) => e.category === cat && e.status === "approved").reduce((s, e) => s + (+e.amount || 0), 0) })).filter((d) => d.value > 0);
-  const PIE_COLORS = ["#B8733A", "#3A7CA8", "#C8A84B", "#48B860", "#D44040", "#8A4EC8", "#D89830", "#7A5AC8", "#5A8A6A", "#4888C8", "#7AAABB", "#8888AA"];
-  const stationRows = (filterStation === "all" ? cwsList : cwsList.filter((c) => c.id === filterStation)).map((cws) => {
-    const ck = cherry.filter((c) => c.cwsId === cws.id && inRange(c.date));
-    const ex = expenses.filter((e) => e.cwsId === cws.id && inRange(e.date) && e.status === "approved");
-    const cb = cashbook.filter((c) => c.cwsId === cws.id && inRange(c.date));
-    const cashBal = cb.reduce((s, c) => c.type === "inflow" ? s + (+c.amount || 0) : s - c.amount, 0);
-    return { cws, kg: ck.reduce((s, c) => s + (+c.totalKg || 0), 0), paid: ck.reduce((s, c) => s + (+c.totalPaid || 0), 0), exp: ex.reduce((s, e) => s + (+e.amount || 0), 0), cashBal, farmers: new Set(ck.map((c) => c.farmerId)).size };
-  });
+  const [filterFrom,    setFilterFrom]    = useState("");
+  const [filterTo,      setFilterTo]      = useState("");
+  const [chartType,     setChartType]     = useState("bar"); // bar | line | pie
+
+  // ── Per-field filters (per report tab) ───────────────────────────
+  const [cherryFilters,  setCherryFilters]  = useState({ farmer:"all", status:"all", method:"all", gnr:"" });
+  const [expFilters,     setExpFilters]     = useState({ category:"all", status:"all", description:"" });
+  const [cashFilters,    setCashFilters]    = useState({ type:"all", category:"all", description:"" });
+  const [bankFilters,    setBankFilters]    = useState({ type:"all", description:"" });
+  const [debtFilters,    setDebtFilters]    = useState({ status:"all", farmer:"all" });
+  const [frFilters,      setFrFilters]      = useState({ status:"all" });
+  const [stockFilters,   setStockFilters]   = useState({ type:"all" });
+
+  // ── Helpers ───────────────────────────────────────────────────────
+  const inRange    = d => (!filterFrom || d >= filterFrom) && (!filterTo || d <= filterTo);
+  const inStation  = id => filterStation === "all" || id === filterStation;
+
+  // ── Filtered datasets ─────────────────────────────────────────────
+  const fCherry = cherry.filter(c =>
+    inStation(c.cwsId) && inRange(c.date) &&
+    (cherryFilters.farmer  === "all" || c.farmerId       === cherryFilters.farmer) &&
+    (cherryFilters.status  === "all" || c.status         === cherryFilters.status) &&
+    (cherryFilters.method  === "all" || c.paymentMethod  === cherryFilters.method) &&
+    (!cherryFilters.gnr    || (c.gnrNumber||"").toLowerCase().includes(cherryFilters.gnr.toLowerCase()))
+  );
+
+  const fExpenses = expenses.filter(e =>
+    inStation(e.cwsId) && inRange(e.date) &&
+    (expFilters.category    === "all" || e.category    === expFilters.category) &&
+    (expFilters.status      === "all" || e.status      === expFilters.status) &&
+    (!expFilters.description || (e.description||"").toLowerCase().includes(expFilters.description.toLowerCase()))
+  );
+
+  const fCashbook = cashbook.filter(c =>
+    inStation(c.cwsId) && inRange(c.date) &&
+    (cashFilters.type        === "all" || c.type     === cashFilters.type) &&
+    (cashFilters.category    === "all" || c.category === cashFilters.category) &&
+    (!cashFilters.description || (c.description||"").toLowerCase().includes(cashFilters.description.toLowerCase()))
+  );
+
+  const fBank = bankTx.filter(b =>
+    inStation(b.cwsId) && inRange(b.date) &&
+    (bankFilters.type        === "all" || b.type === bankFilters.type) &&
+    (!bankFilters.description || (b.description||"").toLowerCase().includes(bankFilters.description.toLowerCase()))
+  );
+
+  const fDebts = debts.filter(d =>
+    inStation(d.cwsId) &&
+    (debtFilters.status === "all" || d.status    === debtFilters.status) &&
+    (debtFilters.farmer === "all" || d.farmerId  === debtFilters.farmer)
+  );
+
+  const fStock = stock.filter(s =>
+    inStation(s.cwsId) && inRange(s.date) &&
+    (stockFilters.type === "all" || s.type === stockFilters.type)
+  );
+
+  const fFR = fundRequests.filter(f =>
+    inStation(f.cwsId) &&
+    (frFilters.status === "all" || f.status === frFilters.status)
+  );
+
+  // ── Summaries ─────────────────────────────────────────────────────
+  const totalCherryKg   = fCherry.reduce((s,c) => s + (+c.totalKg  || 0), 0);
+  const totalPaid       = fCherry.reduce((s,c) => s + (+c.totalPaid|| 0), 0);
+  const totalExp        = fExpenses.filter(e => e.status === "approved").reduce((s,e) => s + (+e.amount || 0), 0);
+  const totalMachIncome = machTx.filter(t => t.type === "income").reduce((s,t) => s + (+t.amount || 0), 0);
+  const totalStock      = fStock.reduce((s,sk) => s + (+sk.totalValue || 0), 0);
+  const totalDebts      = fDebts.reduce((s,d) => s + (+d.balance || 0), 0);
+
+  const PIE_COLORS = ["#C4793C","#4A8EC8","#C8A84B","#4EC866","#E05050",
+                      "#9A5EE0","#E0A030","#7A5AC8","#5A8A6A","#4888C8","#7AAABB","#8888AA"];
+
+  const expByCat = EXPENSE_CATS.map(cat => ({
+    name: cat,
+    value: fExpenses.filter(e => e.category === cat && e.status === "approved")
+                    .reduce((s,e) => s + (+e.amount || 0), 0)
+  })).filter(d => d.value > 0);
+
+  const stationRows = (filterStation === "all" ? cwsList : cwsList.filter(c => c.id === filterStation))
+    .map(cws => {
+      const ck = cherry.filter(c => c.cwsId === cws.id && inRange(c.date));
+      const ex = expenses.filter(e => e.cwsId === cws.id && inRange(e.date) && e.status === "approved");
+      const cb = cashbook.filter(c => c.cwsId === cws.id && inRange(c.date));
+      const cashBal = cb.reduce((s,c) => c.type === "inflow" ? s + (+c.amount||0) : s - (+c.amount||0), 0);
+      return {
+        cws, farmers: new Set(ck.map(c => c.farmerId)).size,
+        kg:   ck.reduce((s,c) => s + (+c.totalKg  ||0), 0),
+        paid: ck.reduce((s,c) => s + (+c.totalPaid||0), 0),
+        exp:  ex.reduce((s,e) => s + (+e.amount   ||0), 0),
+        cashBal,
+      };
+    });
+
+  // ── Chart data builders ───────────────────────────────────────────
+  const cherryByDate = (() => {
+    const map = {};
+    fCherry.forEach(c => { map[c.date] = (map[c.date]||0) + (+c.totalKg||0); });
+    return Object.entries(map).sort(([a],[b]) => a.localeCompare(b))
+      .map(([date, kg]) => ({ date, "Cherry kg": +kg.toFixed(1) }));
+  })();
+
+  const cherryByStation = cwsList.map(cws => ({
+    name: cws.name.replace(" CWS",""),
+    "Cherry kg": fCherry.filter(c => c.cwsId === cws.id).reduce((s,c) => s + (+c.totalKg||0), 0),
+    "Payments (k RWF)": +(fCherry.filter(c => c.cwsId === cws.id).reduce((s,c) => s + (+c.totalPaid||0), 0) / 1000).toFixed(1),
+  }));
+
+  const cherryByFarmer = (() => {
+    const map = {};
+    fCherry.forEach(c => {
+      const f = farmers2.find(x => x.id === c.farmerId);
+      const name = f?.name || c.farmerId;
+      map[name] = (map[name]||0) + (+c.totalKg||0);
+    });
+    return Object.entries(map).sort(([,a],[,b]) => b - a).slice(0,10)
+      .map(([name, kg]) => ({ name, "Cherry kg": +kg.toFixed(1) }));
+  })();
+
+  const expByDateData = (() => {
+    const map = {};
+    fExpenses.filter(e => e.status === "approved").forEach(e => {
+      map[e.date] = (map[e.date]||0) + (+e.amount||0);
+    });
+    return Object.entries(map).sort(([a],[b]) => a.localeCompare(b))
+      .map(([date, amount]) => ({ date, "Expenses (RWF)": amount }));
+  })();
+
+  const cashFlowData = (() => {
+    const map = {};
+    fCashbook.forEach(c => {
+      if (!map[c.date]) map[c.date] = { date: c.date, Inflows: 0, Outflows: 0 };
+      if (c.type === "inflow") map[c.date].Inflows += (+c.amount||0);
+      else map[c.date].Outflows += (+c.amount||0);
+    });
+    return Object.values(map).sort((a,b) => a.date.localeCompare(b.date));
+  })();
+
+  // ── Export CSV ────────────────────────────────────────────────────
   const exportExcel = (type) => {
     let rows = [];
-    let filename = "";
     if (type === "cherry") {
       rows = [
-        ["Date", "GNR Number", "Station", "Farmer ID", "Standard kg", "Flotant kg", "Total kg", "Rate Std", "Rate Flt", "Payment Std", "Payment Flt", "Total Paid", "Avg Rate", "Method", "Status"],
-        ...fCherry.map((c) => {
-          const cws = cwsList.find((x) => x.id === c.cwsId);
-          const f = farmers2.find((x) => x.id === c.farmerId);
-          return [c.date, c.gnrNumber, cws?.name || c.cwsId, f?.farmerId || c.farmerId, c.standardKg, c.flotantKg, c.totalKg, c.rateStandard, c.rateFlotant, c.paymentStandard, c.paymentFlotant, c.totalPaid, (c.avgRate||0), c.paymentMethod, c.status];
+        ["Date","GNR #","Station","Farmer","Std kg","Flt kg","Total kg","Rate Std","Rate Flt","Pmt Std","Pmt Flt","Total Paid","Avg Rate","Method","Status"],
+        ...fCherry.map(c => {
+          const cws = cwsList.find(x => x.id === c.cwsId);
+          const f   = farmers2.find(x => x.id === c.farmerId);
+          return [c.date, c.gnrNumber, cws?.name||c.cwsId, f?.name||c.farmerId,
+                  c.standardKg, c.flotantKg, c.totalKg, c.rateStandard, c.rateFlotant,
+                  c.paymentStandard, c.paymentFlotant, c.totalPaid, (c.avgRate||0),
+                  c.paymentMethod, c.status];
         })
       ];
-      filename = "cherry_purchases";
     } else if (type === "expenses") {
       rows = [
-        ["Date", "Station", "Category", "Description", "Amount", "Exploitable", "Status"],
-        ...fExpenses.map((e) => {
-          const cws = cwsList.find((x) => x.id === e.cwsId);
-          return [e.date, cws?.name || e.cwsId, e.category, e.description, e.amount, e.exploitable ? "Yes" : "No", e.status];
+        ["Date","Station","Category","Description","Amount","Exploitable","Status"],
+        ...fExpenses.map(e => {
+          const cws = cwsList.find(x => x.id === e.cwsId);
+          return [e.date, cws?.name||e.cwsId, e.category, e.description,
+                  e.amount, e.exploitable ? "Yes":"No", e.status];
         })
       ];
-      filename = "expenses";
     } else if (type === "cashbook") {
       rows = [
-        ["Date", "Station", "Type", "Category", "Description", "Amount", "Reference"],
-        ...fCashbook.map((c) => {
-          const cws = cwsList.find((x) => x.id === c.cwsId);
-          return [c.date, cws?.name || c.cwsId, c.type, c.category, c.description, c.amount, c.ref];
+        ["Date","Station","Type","Category","Description","Amount","Reference"],
+        ...fCashbook.map(c => {
+          const cws = cwsList.find(x => x.id === c.cwsId);
+          return [c.date, cws?.name||c.cwsId, c.type, c.category, c.description, c.amount, c.ref];
         })
       ];
-      filename = "cashbook";
     } else if (type === "fund_requests") {
       rows = [
-        ["Station", "Requested By", "Amount", "Reason", "Status", "Requested At", "Transfer Method", "Ref"],
-        ...fFR.map((f) => {
-          const cws = cwsList.find((x) => x.id === f.cwsId);
-          return [cws?.name || f.cwsId, f.requestedBy, f.amount, f.reason, f.status, f.requestedAt || "", f.transferMethod || "", f.transferRef || ""];
+        ["Station","Requested By","Amount","Reason","Status","Requested At","Transfer Method","Ref"],
+        ...fFR.map(f => {
+          const cws = cwsList.find(x => x.id === f.cwsId);
+          return [cws?.name||f.cwsId, f.requestedBy, f.amount, f.reason,
+                  f.status, f.requestedAt||"", f.transferMethod||"", f.transferRef||""];
         })
       ];
-      filename = "fund_requests";
     } else if (type === "station_summary") {
       rows = [
-        ["Station", "Region", "Cherry kg", "Farmers", "Payments (RWF)", "Approved Expenses (RWF)", "Cash Balance", "Net"],
-        ...stationRows.map((r) => [r.cws.name, r.cws.region, r.kg, r.farmers, r.paid, r.exp, r.cashBal, r.cashBal - r.paid - r.exp])
+        ["Station","Region","Cherry kg","Farmers","Payments (RWF)","Expenses (RWF)","Cash Balance","Net"],
+        ...stationRows.map(r => [r.cws.name, r.cws.region, r.kg, r.farmers,
+                                  r.paid, r.exp, r.cashBal, r.cashBal - r.paid - r.exp])
       ];
-      filename = "station_summary";
+    } else if (type === "debts") {
+      rows = [
+        ["Farmer","Station","Type","Amount","Balance","Status"],
+        ...fDebts.map(d => {
+          const cws = cwsList.find(x => x.id === d.cwsId);
+          const f   = farmers2.find(x => x.id === d.farmerId);
+          return [f?.name||d.farmerId, cws?.name||d.cwsId, d.type, d.amount, d.balance, d.status];
+        })
+      ];
+    } else if (type === "stock") {
+      rows = [
+        ["Date","Station","Type","Quantity","Unit","Unit Price","Total Value","Notes"],
+        ...fStock.map(s => {
+          const cws = cwsList.find(x => x.id === s.cwsId);
+          return [s.date, cws?.name||s.cwsId, s.type, s.quantity, s.unit, s.unitPrice, s.totalValue, s.notes||""];
+        })
+      ];
     }
-    const csv = rows.map((r) => r.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(",")).join("\n");
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
+    const csv = rows.map(r => r.map(v => `"${String(v||"").replace(/"/g,'""')}"`).join(",")).join("\n");
+    const blob = new Blob([csv], { type:"text/csv;charset=utf-8;" });
     const a = document.createElement("a");
-    const suffix = filterStation !== "all" ? `_${filterStation}` : "_all_stations";
-    const dateStr = filterFrom ? `_${filterFrom}_to_${filterTo || "present"}` : "";
-    a.href = url;
-    a.download = `bender_${filename}${suffix}${dateStr}.csv`;
+    const sfx = filterStation !== "all" ? `_${filterStation}` : "_all";
+    const dt  = filterFrom ? `_${filterFrom}${filterTo ? "_to_"+filterTo : ""}` : "";
+    a.href = URL.createObjectURL(blob);
+    a.download = `bender_${type}${sfx}${dt}.csv`;
     a.click();
-    URL.revokeObjectURL(url);
+    URL.revokeObjectURL(a.href);
   };
+
+  // ── Print ─────────────────────────────────────────────────────────
   const printReport = () => {
-    const stationName = filterStation === "all" ? "All Stations" : cwsList.find((c) => c.id === filterStation)?.name || filterStation;
-    const dateRange = filterFrom ? `${filterFrom} to ${filterTo || "present"}` : "All dates";
-    const w = window.open("", "_blank");
-    w.document.write(`<html><head><title>Bender Exports \u2014 ${reportType} Report</title>
-    <style>body{font-family:Arial,sans-serif;font-size:11px;color:#111;padding:20px;}
-    h1{font-size:18px;margin-bottom:4px;}h2{font-size:14px;color:#555;margin-bottom:16px;}
-    table{width:100%;border-collapse:collapse;margin-bottom:24px;}
-    th{background:#0F1810;color:#C8A84B;padding:7px 10px;text-align:left;font-size:10px;text-transform:uppercase;}
-    td{padding:6px 10px;border-bottom:1px solid #ddd;font-size:11px;}
-    tr:nth-child(even){background:#f5f5f5;}
-    .kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:20px;}
+    const stn   = filterStation === "all" ? "All Stations" : cwsList.find(c => c.id === filterStation)?.name || filterStation;
+    const range = filterFrom ? `${filterFrom}${filterTo ? " → "+filterTo : " → present"}` : "All dates";
+    const w = window.open("","_blank");
+    w.document.write(`<html><head><title>Bender Exports — Report</title>
+    <style>body{font-family:Arial,sans-serif;font-size:11px;padding:20px;}
+    h1{font-size:18px;}h2{font-size:13px;color:#555;margin-bottom:16px;}
+    table{width:100%;border-collapse:collapse;margin-bottom:20px;}
+    th{background:#0F1810;color:#C8A84B;padding:7px;font-size:10px;text-align:left;}
+    td{padding:6px 8px;border-bottom:1px solid #ddd;font-size:11px;}
+    tr:nth-child(even){background:#f9f9f9;}
+    .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:16px;}
     .kpi{border:1px solid #ddd;padding:10px;border-radius:6px;}
-    .kpi-label{font-size:9px;color:#888;text-transform:uppercase;}
-    .kpi-value{font-size:16px;font-weight:700;margin-top:4px;}
+    .kl{font-size:9px;color:#888;text-transform:uppercase;}.kv{font-size:16px;font-weight:700;margin-top:4px;}
     @media print{body{padding:0;}}
     </style></head><body>
-    <h1>Bender Exports Ltd. \u2014 Report</h1>
-    <h2>${stationName} \xB7 ${dateRange} \xB7 Type: ${reportType}</h2>
-    <div class="kpi-grid">
-      <div class="kpi"><div class="kpi-label">Cherry Purchased</div><div class="kpi-value">${totalCherryKg.toLocaleString()} kg</div></div>
-      <div class="kpi"><div class="kpi-label">Farmer Payments</div><div class="kpi-value">${totalPaid.toLocaleString()} RWF</div></div>
-      <div class="kpi"><div class="kpi-label">Total Expenses</div><div class="kpi-value">${totalExp.toLocaleString()} RWF</div></div>
-      <div class="kpi"><div class="kpi-label">Stock Value</div><div class="kpi-value">${totalStock.toLocaleString()} RWF</div></div>
+    <h1>Bender Exports Ltd. — ${reportType.replace("_"," ").toUpperCase()} Report</h1>
+    <h2>${stn} · ${range}</h2>
+    <div class="grid">
+      <div class="kpi"><div class="kl">Cherry Purchased</div><div class="kv">${totalCherryKg.toLocaleString()} kg</div></div>
+      <div class="kpi"><div class="kl">Farmer Payments</div><div class="kv">${totalPaid.toLocaleString()} RWF</div></div>
+      <div class="kpi"><div class="kl">Approved Expenses</div><div class="kv">${totalExp.toLocaleString()} RWF</div></div>
+      <div class="kpi"><div class="kl">Stock Value</div><div class="kv">${totalStock.toLocaleString()} RWF</div></div>
     </div>
-    <table><thead><tr><th>Station</th><th>Cherry kg</th><th>Farmers</th><th>Payments (RWF)</th><th>Expenses (RWF)</th><th>Cash Balance</th><th>Net</th></tr></thead>
-    <tbody>${stationRows.map((r) => `<tr><td>${r.cws.name}</td><td>${r.kg.toLocaleString()}</td><td>${r.farmers}</td><td>${r.paid.toLocaleString()}</td><td>${r.exp.toLocaleString()}</td><td>${r.cashBal.toLocaleString()}</td><td>${(r.cashBal - r.paid - r.exp).toLocaleString()}</td></tr>`).join("")}</tbody></table></div>
-    <p style="color:#888;font-size:10px;margin-top:20px">Generated: ${(/* @__PURE__ */ new Date()).toLocaleString()} \xB7 Bender Exports Ltd.</p>
+    <table><thead><tr><th>Station</th><th>Cherry kg</th><th>Farmers</th><th>Payments</th><th>Expenses</th><th>Cash Balance</th><th>Net</th></tr></thead>
+    <tbody>${stationRows.map(r=>`<tr><td>${r.cws.name}</td><td>${r.kg.toLocaleString()}</td><td>${r.farmers}</td><td>${r.paid.toLocaleString()}</td><td>${r.exp.toLocaleString()}</td><td>${r.cashBal.toLocaleString()}</td><td>${(r.cashBal-r.paid-r.exp).toLocaleString()}</td></tr>`).join("")}</tbody></table>
+    <p style="color:#888;font-size:9px">Generated: ${new Date().toLocaleString()} · Bender Exports Ltd.</p>
     </body></html>`);
-    w.document.close();
-    w.print();
+    w.document.close(); w.print();
   };
-  const REPORT_TABS = [
-    { id: "cherry", label: "Cherry Purchases" },
-    { id: "expenses", label: "Expenses" },
-    { id: "cashbook", label: "Cash & Bank" },
-    { id: "station_summary", label: "Station Summary" },
-    { id: "fund_requests", label: "Fund Requests" },
-    { id: "stock", label: "Stock" },
-    { id: "debts", label: "Debts" }
-  ];
-  return <div>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16, flexWrap: "wrap", gap: 10 }}>
-        <div style={{ fontFamily: "'Inter',sans-serif", fontSize: 22, letterSpacing: '-0.4px', fontWeight: 700, color: C.text }}>Consolidated Reports</div>
-        <div style={{ display: "flex", gap: 8 }}>
-          <button onClick={() => exportExcel(reportType)} style={{ ...BtnS(C.success), fontSize: 11, padding: "7px 13px" }}>⬇ Export Excel</button>
-          <button onClick={printReport} style={{ ...BtnS(C.info, true), fontSize: 11, padding: "7px 13px" }}>🖨 Print</button>
-        </div>
-      </div>
 
-      {
-    /* ── FILTER BAR ─────────────────────────────────────────── */
-  }
-      <div style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 16, flexWrap: "wrap", padding: "12px 16px", background: C.bgCard, borderRadius: 11, border: `1px solid ${C.border}` }}>
-        <span style={{ fontSize: 11, fontWeight: 700, color: C.textDim, textTransform: "uppercase", letterSpacing: "1px", flexShrink: 0 }}>Filters</span>
-        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-          <span style={{ fontSize: 11, color: C.textMuted }}>Station:</span>
-          <select value={filterStation} onChange={(e) => setFilterStation(e.target.value)} style={{ ...selS(), width: "auto", padding: "6px 10px", fontSize: 12 }}>
-            <option value="all">All Stations</option>
-            {cwsList.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-          </select>
-        </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-          <span style={{ fontSize: 11, color: C.textMuted }}>From:</span>
-          <input type="date" value={filterFrom} onChange={(e) => setFilterFrom(e.target.value)} style={{ ...selS(), width: "auto", padding: "6px 10px", fontSize: 12 }} />
-        </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-          <span style={{ fontSize: 11, color: C.textMuted }}>To:</span>
-          <input type="date" value={filterTo} onChange={(e) => setFilterTo(e.target.value)} style={{ ...selS(), width: "auto", padding: "6px 10px", fontSize: 12 }} />
-        </div>
-        {(filterStation !== "all" || filterFrom || filterTo) && <button onClick={() => {
-    setFilterStation("all");
-    setFilterFrom("");
-    setFilterTo("");
-  }} style={{ ...BtnS(C.danger, false, true), fontSize: 11, padding: "5px 10px" }}>✕ Clear</button>}
-        <span style={{ marginLeft: "auto", fontSize: 11, color: C.textDim }}>
-          {filterStation !== "all" ? cwsList.find((c) => c.id === filterStation)?.name : "All Stations"}
-          {filterFrom ? ` \xB7 ${filterFrom}${filterTo ? ` \u2192 ${filterTo}` : " \u2192 present"}` : ""}
-        </span>
-      </div>
-
-      {
-    /* ── KPI SUMMARY ────────────────────────────────────────── */
-  }
-      <div className="kpi-grid" style={{ display: "grid", gap: 12, marginBottom: 16  }}>
-        <SC label="Cherry Purchased" value={fmtKg(totalCherryKg)} color={C.coffee} />
-        <SC label="Farmer Payments" value={fmtRWF(totalPaid)} color={C.danger} />
-        <SC label="Approved Expenses" value={fmtRWF(totalExp)} color={C.warning} />
-        <SC label="Stock Value" value={fmtRWF(totalStock)} color={C.gold} />
-      </div>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(130px,1fr))", gap: 12, marginBottom: 16 }}>
-        <SC label="Machine Revenue" value={fmtRWF(totalMachIncome)} color={C.machinery} />
-        <SC label="Outstanding Debts" value={fmtRWF(totalDebts)} color={C.info} />
-        <SC label="Approved Fund Transfers" value={fmtRWF(fFR.filter((f) => f.status === "approved").reduce((s, f) => s + (+f.amount || 0), 0))} color={C.success} />
-      </div>
-
-      {
-    /* ── REPORT TYPE TABS ───────────────────────────────────── */
-  }
-      <Tabs tabs={REPORT_TABS.map((t) => t.id)} labels={REPORT_TABS.map((t) => t.label)} active={reportType} onChange={setReportType} color={C.gold} />
-
-      {
-    /* ── CHERRY REPORT ──────────────────────────────────────── */
-  }
-      {reportType === "cherry" && <div>
-          <div className="kpi-grid" style={{ display: "grid", gap: 10, marginBottom: 14  }}>
-            <SC label="GNR Records" value={fCherry.length} color={C.coffee} />
-            <SC label="Standard kg" value={fmtKg(fCherry.reduce((s, c) => s + (+c.standardKg || 0), 0))} color={C.coffeeLight} />
-            <SC label="Flotant kg" value={fmtKg(fCherry.reduce((s, c) => s + (+c.flotantKg || 0), 0))} color={C.warning} />
-            <SC label="Avg Rate" value={`${fCherry.length > 0 ? (fCherry.reduce((s, c) => s + (c.avgRate||0), 0) / fCherry.length).toFixed(1) : 0} RWF/kg`} color={C.info} />
-          </div>
-          <div style={{ background: C.gradCard, border: `1px solid ${C.border}`, borderRadius: 14, overflow: "hidden" }}>
-            <div style={{ padding: "11px 16px", borderBottom: `1px solid ${C.border}`, fontWeight: 700, fontSize: 13, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <span>Cherry Purchase Records ({fCherry.length})</span>
-              <button onClick={() => exportExcel("cherry")} style={{ ...BtnS(C.success, true), fontSize: 10, padding: "4px 10px" }}>⬇ CSV</button>
-            </div>
-            <GNRTable rows={fCherry} cwsList={cwsList} farmers={farmers2} full showStation />
-          </div>
-        </div>}
-
-      {
-    /* ── EXPENSES REPORT ────────────────────────────────────── */
-  }
-      {reportType === "expenses" && <div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(180px,1fr))", gap: 14, marginBottom: 14 }}>
-            <div style={{ background: C.gradCard, border: `1px solid ${C.border}`, borderRadius: 14, padding: "14px 16px 8px" }}>
-              <div style={{ fontWeight: 700, fontSize: 12, marginBottom: 12 }}>By Category (Approved)</div>
-              {expByCat.length === 0
-                ? <div style={{ padding: "24px 0", textAlign: "center", color: C.textDim, fontSize: 12 }}>No approved expenses in range</div>
-                : <ResponsiveContainer width="100%" height={180}>
-                    <PieChart><Pie data={expByCat} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={65} label={({ name, percent }) => percent > 0.05 ? `${(percent * 100).toFixed(0)}%` : ""} labelLine={false} style={{ fontSize: 9 }}>
-                      {expByCat.map((e, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
-                    </Pie><Tooltip formatter={(v) => [fmtRWF(v), "Amount"]} contentStyle={{ background: C.gradCard, border: `1px solid ${C.border}`, borderRadius: 12, fontSize: 11 }} /></PieChart>
-                  </ResponsiveContainer>}
-            </div>
-            <div style={{ background: C.gradCard, border: `1px solid ${C.border}`, borderRadius: 14, padding: "14px 16px" }}>
-              <div style={{ fontWeight: 700, fontSize: 12, marginBottom: 10 }}>Category Breakdown</div>
-              {expByCat.map((ec, i) => <div key={ec.name} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "5px 0", borderBottom: `1px solid ${C.border}15` }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <div style={{ width: 8, height: 8, borderRadius: "50%", background: PIE_COLORS[i % PIE_COLORS.length], flexShrink: 0 }} />
-                    <span style={{ fontSize: 12, color: C.textMuted }}>{ec.name}</span>
-                  </div>
-                  <span style={{ fontSize: 12, fontWeight: 700, color: C.warning }}>{fmtRWF(ec.value)}</span>
-                </div>)}
-            </div>
-          </div>
-          <div style={{ background: C.gradCard, border: `1px solid ${C.border}`, borderRadius: 14, overflow: "hidden" }}>
-            <div style={{ padding: "11px 16px", borderBottom: `1px solid ${C.border}`, fontWeight: 700, fontSize: 13, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <span>Expense Ledger ({fExpenses.length})</span>
-              <button onClick={() => exportExcel("expenses")} style={{ ...BtnS(C.success, true), fontSize: 10, padding: "4px 10px" }}>⬇ CSV</button>
-            </div>
-            <ExpTable rows={fExpenses} full showStation cwsList={cwsList} />
-          </div>
-        </div>}
-
-      {
-    /* ── CASH & BANK REPORT ─────────────────────────────────── */
-  }
-      {reportType === "cashbook" && <div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(130px,1fr))", gap: 12, marginBottom: 14 }}>
-            <SC label="Total Cash Inflows" value={fmtRWF(fCashbook.filter((c) => c.type === "inflow").reduce((s, c) => s + (+c.amount || 0), 0))} color={C.success} />
-            <SC label="Total Cash Outflows" value={fmtRWF(fCashbook.filter((c) => c.type === "outflow").reduce((s, c) => s + (+c.amount || 0), 0))} color={C.danger} />
-            <SC label="Total Bank Credits" value={fmtRWF(fBank.filter((b) => b.type === "credit").reduce((s, b) => s + (+b.amount || 0), 0))} color={C.info} />
-          </div>
-          <div style={{ background: C.gradCard, border: `1px solid ${C.border}`, borderRadius: 14, overflow: "hidden", marginBottom: 14 }}>
-            <div style={{ padding: "11px 16px", borderBottom: `1px solid ${C.border}`, fontWeight: 700, fontSize: 13, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <span>Cash Book ({fCashbook.length})</span>
-              <button onClick={() => exportExcel("cashbook")} style={{ ...BtnS(C.success, true), fontSize: 10, padding: "4px 10px" }}>⬇ CSV</button>
-            </div>
-            <CashTable rows={fCashbook} />
-          </div>
-          <div style={{ background: C.gradCard, border: `1px solid ${C.border}`, borderRadius: 14, overflow: "hidden" }}>
-            <div style={{ padding: "11px 16px", borderBottom: `1px solid ${C.border}`, fontWeight: 700, fontSize: 13 }}>Bank Transactions ({fBank.length})</div>
-            <BankTable rows={fBank} />
-          </div>
-        </div>}
-
-      {
-    /* ── STATION SUMMARY REPORT ─────────────────────────────── */
-  }
-      {reportType === "station_summary" && <div>
-          <div style={{ background: C.gradCard, border: `1px solid ${C.border}`, borderRadius: 14, overflow: "hidden", marginBottom: 14 }}>
-            <div style={{ padding: "11px 16px", borderBottom: `1px solid ${C.border}`, fontWeight: 700, fontSize: 13, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <span>Station Summary ({stationRows.length} stations)</span>
-              <button onClick={() => exportExcel("station_summary")} style={{ ...BtnS(C.success, true), fontSize: 10, padding: "4px 10px" }}>⬇ CSV</button>
-            </div>
-            <div className="tbl-wrap"><table style={{ width: "100%", borderCollapse: "collapse" }}>
-              <thead><tr style={{ background: C.surface }}>{["Station", "Region", "Cherry kg", "Farmers", "Payments (RWF)", "Expenses (RWF)", "Cash Balance", "Net"].map((h) => <Th key={h}>{h}</Th>)}</tr></thead>
-              <tbody>{stationRows.map((row) => {
-    const net = row.cashBal - row.paid - row.exp;
-    return <tr key={row.cws.id} style={{ borderBottom: `1px solid ${C.border}15` }} onMouseEnter={(e) => e.currentTarget.style.background = C.surface} onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}>
-                  <Td style={{ color: C.coffeeLight, fontWeight: 600 }}>☕ {row.cws.name}</Td>
-                  <Td style={{ color: C.textMuted }}>{row.cws.region}</Td>
-                  <Td style={{ fontWeight: 700, color: C.coffee }}>{fmtKg(row.kg)}</Td>
-                  <Td style={{ color: C.info }}>{row.farmers}</Td>
-                  <Td style={{ color: C.danger, fontWeight: 700 }}>{fmtRWF(row.paid)}</Td>
-                  <Td style={{ color: C.warning, fontWeight: 700 }}>{fmtRWF(row.exp)}</Td>
-                  <Td style={{ color: row.cashBal > 0 ? C.success : C.danger, fontWeight: 700 }}>{fmtRWF(row.cashBal)}</Td>
-                  <Td><span style={{ padding: "3px 8px", borderRadius: 4, fontSize: 10, fontWeight: 700, background: net > 0 ? `${C.success}15` : `${C.danger}15`, color: net > 0 ? C.success : C.danger }}>{fmtRWF(net)}</span></Td>
-                </tr>;
-  })}</tbody>
-            </table></div>
-          </div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(180px,1fr))", gap: 14 }}>
-            <div style={{ background: C.gradCard, border: `1px solid ${C.border}`, borderRadius: 14, padding: "14px 16px 8px" }}>
-              <div style={{ fontWeight: 700, fontSize: 12, marginBottom: 12 }}>Cherry kg per Station</div>
-              {stationRows.every(r => r.kg === 0)
-                ? <div style={{ padding: "24px 0", textAlign: "center", color: C.textDim, fontSize: 12 }}>No data in selected range</div>
-                : <ResponsiveContainer width="100%" height={180}>
-                    <BarChart data={stationRows.map((r) => ({ name: r.cws.name.replace(" CWS", ""), "Cherry kg": r.kg }))} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
-                      <CartesianGrid strokeDasharray="3 3" stroke={C.border} vertical={false} />
-                      <XAxis dataKey="name" tick={{ fill: C.textMuted, fontSize: 10 }} axisLine={false} tickLine={false} />
-                      <YAxis tick={{ fill: C.textMuted, fontSize: 9 }} tickFormatter={(v) => v >= 1000 ? `${(v/1000).toFixed(0)}k` : v} axisLine={false} tickLine={false} width={32} />
-                      <Tooltip contentStyle={{ background: C.gradCard, border: `1px solid ${C.border}`, borderRadius: 12, fontSize: 11 }} formatter={(v) => [fmtKg(v), "Cherry kg"]} />
-                      <Bar dataKey="Cherry kg" fill={C.coffee} radius={[4, 4, 0, 0]} label={{ position: "top", fontSize: 9, fill: C.textMuted, formatter: (v) => v > 0 ? `${v}kg` : "" }} />
-                    </BarChart>
-                  </ResponsiveContainer>}
-            </div>
-            <div style={{ background: C.gradCard, border: `1px solid ${C.border}`, borderRadius: 14, padding: "14px 16px 8px" }}>
-              <div style={{ fontWeight: 700, fontSize: 12, marginBottom: 12 }}>Expenses by Category</div>
-              {expByCat.length === 0
-                ? <div style={{ padding: "24px 0", textAlign: "center", color: C.textDim, fontSize: 12 }}>No approved expenses</div>
-                : <ResponsiveContainer width="100%" height={180}>
-                    <PieChart><Pie data={expByCat} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={65} label={({ name, percent }) => percent > 0.05 ? `${(percent * 100).toFixed(0)}%` : ""} labelLine={false} style={{ fontSize: 9 }}>
-                      {expByCat.map((e, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
-                    </Pie><Tooltip formatter={(v) => [fmtRWF(v), "Amount"]} contentStyle={{ background: C.gradCard, border: `1px solid ${C.border}`, borderRadius: 12, fontSize: 11 }} /></PieChart>
-                  </ResponsiveContainer>}
-            </div>
-          </div>
-        </div>}
-
-      {
-    /* ── FUND REQUESTS REPORT ───────────────────────────────── */
-  }
-      {reportType === "fund_requests" && <div>
-          <div className="kpi-grid" style={{ display: "grid", gap: 12, marginBottom: 14  }}>
-            <SC label="Total Requested" value={fmtRWF(fFR.reduce((s, f) => s + (+f.amount || 0), 0))} color={C.warning} />
-            <SC label="Total Approved" value={fmtRWF(fFR.filter((f) => f.status === "approved").reduce((s, f) => s + (+f.amount || 0), 0))} color={C.success} />
-            <SC label="Pending" value={fFR.filter((f) => f.status.includes("pending")).length} color={C.gold} />
-            <SC label="Rejected" value={fFR.filter((f) => f.status === "rejected").length} color={C.danger} />
-          </div>
-          <div style={{ background: C.gradCard, border: `1px solid ${C.border}`, borderRadius: 14, overflow: "hidden" }}>
-            <div style={{ padding: "11px 16px", borderBottom: `1px solid ${C.border}`, fontWeight: 700, fontSize: 13, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <span>Fund Request Log ({fFR.length})</span>
-              <button onClick={() => exportExcel("fund_requests")} style={{ ...BtnS(C.success, true), fontSize: 10, padding: "4px 10px" }}>⬇ CSV</button>
-            </div>
-            <FundTable rows={fFR} users={[]} cwsList={cwsList} />
-          </div>
-        </div>}
-
-      {
-    /* ── STOCK REPORT ───────────────────────────────────────── */
-  }
-      {reportType === "stock" && <div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(130px,1fr))", gap: 12, marginBottom: 14 }}>
-            <SC label="Total Tonnes In" value={`${fStock.reduce((s, sk) => s + sk.tonnesIn, 0).toFixed(2)} T`} color={C.coffee} />
-            <SC label="Total Balance" value={`${fStock.reduce((s, sk) => s + sk.tonnesBalance, 0).toFixed(2)} T`} color={C.gold} />
-            <SC label="Total Value" value={fmtRWF(totalStock)} color={C.success} />
-          </div>
-          <div style={{ background: C.gradCard, border: `1px solid ${C.border}`, borderRadius: 14, overflow: "hidden" }}>
-            <div style={{ padding: "11px 16px", borderBottom: `1px solid ${C.border}`, fontWeight: 700, fontSize: 13 }}>Stock Movements</div>
-            {fStock.length === 0 ? <ES text="No stock records for selected filters" /> : <div className="tbl-wrap"><table style={{ width: "100%", borderCollapse: "collapse" }}>
-                <thead><tr style={{ background: C.surface }}>{["Date", "Station", "Description", "Grade", "Tonnes In", "Balance", "Unit Cost", "Total Value", "Method"].map((h) => <Th key={h}>{h}</Th>)}</tr></thead>
-                <tbody>{fStock.map((sk) => {
-    const cws = cwsList.find((c) => c.id === sk.cwsId);
-    return <tr key={sk.id} style={{ borderBottom: `1px solid ${C.border}15` }} onMouseEnter={(e) => e.currentTarget.style.background = C.surface} onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}>
-                  <Td style={{ color: C.textMuted }}>{sk.date}</Td>
-                  <Td style={{ color: C.coffeeLight }}>{cws?.name || sk.cwsId}</Td>
-                  <Td>{sk.description}</Td>
-                  <Td><span style={{ padding: "2px 7px", borderRadius: 4, fontSize: 10, fontWeight: 700, background: `${C.coffee}18`, color: C.coffeeLight }}>{sk.grade}</span></Td>
-                  <Td style={{ color: C.success, fontWeight: 700 }}>{sk.tonnesIn.toFixed(2)} T</Td>
-                  <Td style={{ color: C.gold, fontWeight: 700 }}>{sk.tonnesBalance.toFixed(2)} T</Td>
-                  <Td style={{ color: C.textMuted }}>{fmtRWF(sk.unitCost)}/kg</Td>
-                  <Td style={{ fontWeight: 700 }}>{fmtRWF(sk.totalValue)}</Td>
-                  <Td style={{ fontSize: 10, color: C.textDim }}>{sk.valuationMethod.replace(/_/g, " ")}</Td>
-                </tr>;
-  })}</tbody>
-              </table></div>}
-          </div>
-        </div>}
-
-      {
-    /* ── DEBTS REPORT ───────────────────────────────────────── */
-  }
-      {reportType === "debts" && <div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(130px,1fr))", gap: 12, marginBottom: 14 }}>
-            <SC label="Total Debt Given" value={fmtRWF(fDebts.filter((d) => d.type === "debt_given").reduce((s, d) => s + (+d.amount || 0), 0))} color={C.danger} />
-            <SC label="Total Owed to CWS" value={fmtRWF(fDebts.filter((d) => d.type === "debt_to_others").reduce((s, d) => s + (+d.amount || 0), 0))} color={C.warning} />
-            <SC label="Total Outstanding" value={fmtRWF(totalDebts)} color={C.info} />
-          </div>
-          <div style={{ background: C.gradCard, border: `1px solid ${C.border}`, borderRadius: 14, overflow: "hidden" }}>
-            <div style={{ padding: "11px 16px", borderBottom: `1px solid ${C.border}`, fontWeight: 700, fontSize: 13 }}>Debt & Liability Register</div>
-            {fDebts.length === 0 ? <ES text="No debt records for selected filters" /> : <div className="tbl-wrap"><table style={{ width: "100%", borderCollapse: "collapse" }}>
-                <thead><tr style={{ background: C.surface }}>{["Date", "Station", "Type", "Party", "Description", "Amount", "Balance", "Status"].map((h) => <Th key={h}>{h}</Th>)}</tr></thead>
-                <tbody>{fDebts.map((d) => {
-    const cws = cwsList.find((c) => c.id === d.cwsId);
-    return <tr key={d.id} style={{ borderBottom: `1px solid ${C.border}15` }} onMouseEnter={(e) => e.currentTarget.style.background = C.surface} onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}>
-                  <Td style={{ color: C.textMuted }}>{d.date}</Td>
-                  <Td style={{ color: C.coffeeLight }}>{cws?.name || d.cwsId}</Td>
-                  <Td><span style={{ padding: "2px 7px", borderRadius: 4, fontSize: 10, fontWeight: 700, background: `${d.type === "debt_given" ? C.danger : C.warning}18`, color: d.type === "debt_given" ? C.danger : C.warning }}>{d.type.replace(/_/g, " ")}</span></Td>
-                  <Td style={{ fontWeight: 600 }}>{d.party}</Td>
-                  <Td style={{ color: C.textMuted }}>{d.description}</Td>
-                  <Td style={{ fontWeight: 700, color: C.danger }}>{fmtRWF(d.amount)}</Td>
-                  <Td style={{ fontWeight: 700, color: C.warning }}>{fmtRWF(d.balance)}</Td>
-                  <Td><SB status={d.status} /></Td>
-                </tr>;
-  })}</tbody>
-              </table></div>}
-          </div>
-        </div>}
+  // ── Reusable filter badge ─────────────────────────────────────────
+  const FBadge = ({ label, value, options, onChange, showAll=true }) =>
+    <div style={{ display:"flex", alignItems:"center", gap:5 }}>
+      <span style={{ fontSize:10, fontWeight:600, color:C.textDim, textTransform:"uppercase", letterSpacing:"0.6px", whiteSpace:"nowrap" }}>{label}</span>
+      <select value={value} onChange={e => onChange(e.target.value)}
+        style={{ ...selS(), width:"auto", padding:"5px 9px", fontSize:11 }}>
+        {showAll && <option value="all">All</option>}
+        {options.map(o => <option key={o.value||o} value={o.value||o}>{o.label||o}</option>)}
+      </select>
     </div>;
+
+  const FSearch = ({ placeholder, value, onChange }) =>
+    <div style={{ position:"relative" }}>
+      <span style={{ position:"absolute", left:9, top:"50%", transform:"translateY(-50%)", color:C.textDim, fontSize:12, pointerEvents:"none" }}>🔍</span>
+      <input value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder}
+        style={{ ...selS(), width:160, padding:"5px 9px 5px 28px", fontSize:11 }} />
+    </div>;
+
+  // ── Chart switcher ─────────────────────────────────────────────────
+  const ChartToggle = () =>
+    <div style={{ display:"flex", gap:3, background:C.bgDeep, padding:3, borderRadius:8, border:`1px solid ${C.border}` }}>
+      {[["bar","▬ Bar"],["line","↗ Line"],["pie","◉ Pie"]].map(([t,l]) =>
+        <div key={t} onClick={() => setChartType(t)}
+          style={{ padding:"4px 10px", borderRadius:6, cursor:"pointer", fontSize:11,
+            fontWeight: chartType===t ? 700 : 400,
+            color: chartType===t ? C.gold : C.textMuted,
+            background: chartType===t ? `${C.gold}18` : "transparent",
+            border:`1px solid ${chartType===t ? C.gold+"28" : "transparent"}`,
+            transition:"all .15s" }}>{l}</div>)}
+    </div>;
+
+  // ── Universal chart renderer ───────────────────────────────────────
+  const SmartChart = ({ data, bars=[], lines=[], colors=[], height=200, labelKey="date" }) => {
+    if (!data || data.length === 0)
+      return <div style={{ padding:"28px 0", textAlign:"center", color:C.textDim, fontSize:12 }}>
+        <div style={{ fontSize:24, marginBottom:8, opacity:.3 }}>◎</div>No data for current filters
+      </div>;
+
+    const keys = bars.length ? bars : lines.length ? lines : Object.keys(data[0]).filter(k => k !== labelKey);
+    const colPalette = colors.length ? colors : [C.coffee, C.gold, C.machinery, C.success, C.danger, C.purple];
+
+    if (chartType === "pie") {
+      const pieData = data.reduce((acc, row) => {
+        const key = row[labelKey] || row.name || row.date;
+        const val = +row[keys[0]] || 0;
+        const existing = acc.find(x => x.name === key);
+        if (existing) existing.value += val;
+        else acc.push({ name: key, value: val });
+        return acc;
+      }, []);
+      return <ResponsiveContainer width="100%" height={height}>
+        <PieChart>
+          <Pie data={pieData} dataKey="value" nameKey="name" cx="50%" cy="50%"
+            outerRadius={70} label={({name, percent}) => percent > 0.05 ? `${(percent*100).toFixed(0)}%` : ""} labelLine={false}>
+            {pieData.map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
+          </Pie>
+          <Tooltip formatter={(v) => [v.toLocaleString(), keys[0]]}
+            contentStyle={{ background:C.gradCard, border:`1px solid ${C.borderLight}`, borderRadius:10, fontSize:11 }} />
+          <Legend wrapperStyle={{ fontSize:10 }} />
+        </PieChart>
+      </ResponsiveContainer>;
+    }
+
+    if (chartType === "line") {
+      return <ResponsiveContainer width="100%" height={height}>
+        <LineChart data={data} margin={{ top:4, right:8, left:0, bottom:0 }}>
+          <CartesianGrid strokeDasharray="3 3" stroke={C.border} vertical={false} />
+          <XAxis dataKey={labelKey} tick={{ fill:C.textMuted, fontSize:10 }} axisLine={false} tickLine={false}
+            tickFormatter={v => v && v.length > 8 ? v.slice(5) : v} />
+          <YAxis tick={{ fill:C.textMuted, fontSize:9 }} axisLine={false} tickLine={false} width={40}
+            tickFormatter={v => v >= 1000 ? `${(v/1000).toFixed(0)}k` : v} />
+          <Tooltip contentStyle={{ background:C.gradCard, border:`1px solid ${C.borderLight}`, borderRadius:10, fontSize:11 }} />
+          <Legend wrapperStyle={{ fontSize:11, paddingTop:8 }} />
+          {keys.map((k, i) => <Line key={k} type="monotone" dataKey={k}
+            stroke={colPalette[i % colPalette.length]} strokeWidth={2} dot={false} />)}
+        </LineChart>
+      </ResponsiveContainer>;
+    }
+
+    return <ResponsiveContainer width="100%" height={height}>
+      <BarChart data={data} barGap={4} barCategoryGap="30%" margin={{ top:4, right:8, left:0, bottom:0 }}>
+        <CartesianGrid strokeDasharray="3 3" stroke={C.border} vertical={false} />
+        <XAxis dataKey={labelKey} tick={{ fill:C.textMuted, fontSize:10 }} axisLine={false} tickLine={false}
+          tickFormatter={v => v && v.length > 8 ? v.slice(5) : v} />
+        <YAxis tick={{ fill:C.textMuted, fontSize:9 }} axisLine={false} tickLine={false} width={40}
+          tickFormatter={v => v >= 1000 ? `${(v/1000).toFixed(0)}k` : v} />
+        <Tooltip contentStyle={{ background:C.gradCard, border:`1px solid ${C.borderLight}`, borderRadius:10, fontSize:11 }} />
+        <Legend wrapperStyle={{ fontSize:11, paddingTop:8 }} />
+        {keys.map((k, i) => <Bar key={k} dataKey={k} fill={colPalette[i % colPalette.length]} radius={[4,4,0,0]} />)}
+      </BarChart>
+    </ResponsiveContainer>;
+  };
+
+  // ── Filter bar card ────────────────────────────────────────────────
+  const FilterCard = ({ children }) =>
+    <div style={{ display:"flex", gap:8, alignItems:"center", flexWrap:"wrap",
+      padding:"10px 14px", background:C.gradCard, borderRadius:12,
+      border:`1px solid ${C.border}`, marginBottom:14 }}>
+      {children}
+    </div>;
+
+  const REPORT_TABS = [
+    { id:"cherry",          label:"Cherry Purchases" },
+    { id:"expenses",        label:"Expenses" },
+    { id:"cashbook",        label:"Cash & Bank" },
+    { id:"station_summary", label:"Station Summary" },
+    { id:"fund_requests",   label:"Fund Requests" },
+    { id:"stock",           label:"Stock" },
+    { id:"debts",           label:"Debts" },
+  ];
+
+  const uniquePayMethods = [...new Set(cherry.map(c => c.paymentMethod).filter(Boolean))];
+  const uniqueExpCats    = EXPENSE_CATS;
+  const uniqueCashCats   = [...new Set(cashbook.map(c => c.category).filter(Boolean))];
+  const farmerOptions    = farmers2.map(f => ({ value:f.id, label:f.name||f.farmerId }));
+
+  return <div>
+    {/* ── Header ── */}
+    <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:16, flexWrap:"wrap", gap:10 }}>
+      <div style={{ fontSize:22, fontWeight:700, letterSpacing:"-0.4px" }}>Consolidated Reports</div>
+      <div style={{ display:"flex", gap:8, alignItems:"center" }}>
+        <ChartToggle />
+        <button onClick={() => exportExcel(reportType)} style={{ ...BtnS(C.success), fontSize:11, padding:"7px 13px" }}>⬇ Export CSV</button>
+        <button onClick={printReport} style={{ ...BtnS(C.info, true), fontSize:11, padding:"7px 13px" }}>🖨 Print</button>
+      </div>
+    </div>
+
+    {/* ── Global Filters ── */}
+    <FilterCard>
+      <span style={{ fontSize:10, fontWeight:700, color:C.textDim, textTransform:"uppercase", letterSpacing:"1px", flexShrink:0 }}>Filters</span>
+      <FBadge label="Station" value={filterStation} onChange={setFilterStation}
+        options={cwsList.map(c => ({ value:c.id, label:c.name }))} />
+      <div style={{ display:"flex", alignItems:"center", gap:5 }}>
+        <span style={{ fontSize:10, fontWeight:600, color:C.textDim, textTransform:"uppercase", letterSpacing:"0.6px" }}>From</span>
+        <input type="date" value={filterFrom} onChange={e => setFilterFrom(e.target.value)}
+          style={{ ...selS(), width:"auto", padding:"5px 9px", fontSize:11 }} />
+      </div>
+      <div style={{ display:"flex", alignItems:"center", gap:5 }}>
+        <span style={{ fontSize:10, fontWeight:600, color:C.textDim, textTransform:"uppercase", letterSpacing:"0.6px" }}>To</span>
+        <input type="date" value={filterTo} onChange={e => setFilterTo(e.target.value)}
+          style={{ ...selS(), width:"auto", padding:"5px 9px", fontSize:11 }} />
+      </div>
+      {(filterStation !== "all" || filterFrom || filterTo) &&
+        <button onClick={() => { setFilterStation("all"); setFilterFrom(""); setFilterTo(""); }}
+          style={{ ...BtnS(C.danger, false, true), fontSize:10, padding:"4px 10px" }}>✕ Clear</button>}
+      <span style={{ marginLeft:"auto", fontSize:11, color:C.textDim }}>
+        {filterStation !== "all" ? cwsList.find(c => c.id === filterStation)?.name : "All Stations"}
+        {filterFrom ? ` · ${filterFrom}${filterTo ? " → "+filterTo : " → present"}` : ""}
+      </span>
+    </FilterCard>
+
+    {/* ── KPI Summary ── */}
+    <div className="kpi-grid" style={{ marginBottom:14 }}>
+      <SC label="Cherry Purchased"    value={fmtKg(totalCherryKg)}    color={C.coffee}   icon="☕" />
+      <SC label="Farmer Payments"     value={fmtRWF(totalPaid)}        color={C.danger}   icon="💰" />
+      <SC label="Approved Expenses"   value={fmtRWF(totalExp)}         color={C.warning}  icon="📋" />
+      <SC label="Stock Value"         value={fmtRWF(totalStock)}       color={C.gold}     icon="📦" />
+      <SC label="Machine Revenue"     value={fmtRWF(totalMachIncome)}  color={C.machinery}icon="🏗️" />
+      <SC label="Outstanding Debts"   value={fmtRWF(totalDebts)}       color={C.info}     icon="⚠️" />
+    </div>
+
+    {/* ── Report Tabs ── */}
+    <Tabs tabs={REPORT_TABS.map(t => t.id)} labels={REPORT_TABS.map(t => t.label)}
+      active={reportType} onChange={setReportType} color={C.gold} />
+
+    {/* ══ CHERRY REPORT ══════════════════════════════════════════════ */}
+    {reportType === "cherry" && <div>
+      {/* Per-field filters */}
+      <FilterCard>
+        <FBadge label="Status" value={cherryFilters.status} onChange={v => setCherryFilters(p=>({...p,status:v}))}
+          options={["pending","paid","not_paid"]} />
+        <FBadge label="Payment Method" value={cherryFilters.method} onChange={v => setCherryFilters(p=>({...p,method:v}))}
+          options={uniquePayMethods} />
+        <FBadge label="Farmer" value={cherryFilters.farmer} onChange={v => setCherryFilters(p=>({...p,farmer:v}))}
+          options={farmerOptions} />
+        <FSearch placeholder="Search GNR #" value={cherryFilters.gnr}
+          onChange={v => setCherryFilters(p=>({...p,gnr:v}))} />
+        {(cherryFilters.status !== "all" || cherryFilters.method !== "all" || cherryFilters.farmer !== "all" || cherryFilters.gnr) &&
+          <button onClick={() => setCherryFilters({ farmer:"all", status:"all", method:"all", gnr:"" })}
+            style={{ ...BtnS(C.danger, false, true), fontSize:10, padding:"4px 8px" }}>✕</button>}
+      </FilterCard>
+
+      {/* KPIs */}
+      <div className="kpi-grid" style={{ marginBottom:14 }}>
+        <SC label="GNR Records"  value={fCherry.length}  color={C.coffee} />
+        <SC label="Standard kg"  value={fmtKg(fCherry.reduce((s,c) => s+(+c.standardKg||0),0))} color={C.coffeeLight} />
+        <SC label="Flotant kg"   value={fmtKg(fCherry.reduce((s,c) => s+(+c.flotantKg||0),0))}  color={C.warning} />
+        <SC label="Avg Rate"     value={`${fCherry.length > 0 ? (fCherry.reduce((s,c)=>s+(c.avgRate||0),0)/fCherry.length).toFixed(1) : 0} RWF/kg`} color={C.info} />
+      </div>
+
+      {/* Charts */}
+      <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(280px,1fr))", gap:14, marginBottom:14 }}>
+        <div style={{ background:C.gradCard, border:`1px solid ${C.border}`, borderRadius:14, padding:"14px 16px 8px" }}>
+          <div style={{ fontWeight:700, fontSize:13, marginBottom:12 }}>Cherry by Date</div>
+          <SmartChart data={cherryByDate} bars={["Cherry kg"]} colors={[C.coffee]} height={180} />
+        </div>
+        <div style={{ background:C.gradCard, border:`1px solid ${C.border}`, borderRadius:14, padding:"14px 16px 8px" }}>
+          <div style={{ fontWeight:700, fontSize:13, marginBottom:12 }}>By Station</div>
+          <SmartChart data={cherryByStation} bars={["Cherry kg","Payments (k RWF)"]} colors={[C.coffee, C.gold]} height={180} labelKey="name" />
+        </div>
+        <div style={{ background:C.gradCard, border:`1px solid ${C.border}`, borderRadius:14, padding:"14px 16px 8px" }}>
+          <div style={{ fontWeight:700, fontSize:13, marginBottom:12 }}>Top 10 Farmers</div>
+          <SmartChart data={cherryByFarmer} bars={["Cherry kg"]} colors={[C.coffeeLight]} height={180} labelKey="name" />
+        </div>
+      </div>
+
+      {/* Table */}
+      <div style={{ background:C.gradCard, border:`1px solid ${C.border}`, borderRadius:14, overflow:"hidden" }}>
+        <div style={{ padding:"11px 16px", borderBottom:`1px solid ${C.border}`, fontWeight:700, fontSize:13,
+          display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+          <span>Cherry Purchase Records ({fCherry.length})</span>
+          <button onClick={() => exportExcel("cherry")} style={{ ...BtnS(C.success, true), fontSize:10, padding:"4px 10px" }}>⬇ CSV</button>
+        </div>
+        <GNRTable rows={fCherry} cwsList={cwsList} farmers={farmers2} full showStation />
+      </div>
+    </div>}
+
+    {/* ══ EXPENSES REPORT ════════════════════════════════════════════ */}
+    {reportType === "expenses" && <div>
+      <FilterCard>
+        <FBadge label="Category" value={expFilters.category} onChange={v => setExpFilters(p=>({...p,category:v}))}
+          options={uniqueExpCats} />
+        <FBadge label="Status" value={expFilters.status} onChange={v => setExpFilters(p=>({...p,status:v}))}
+          options={["pending","approved","rejected"]} />
+        <FSearch placeholder="Search description" value={expFilters.description}
+          onChange={v => setExpFilters(p=>({...p,description:v}))} />
+        {(expFilters.category !== "all" || expFilters.status !== "all" || expFilters.description) &&
+          <button onClick={() => setExpFilters({ category:"all", status:"all", description:"" })}
+            style={{ ...BtnS(C.danger, false, true), fontSize:10, padding:"4px 8px" }}>✕</button>}
+      </FilterCard>
+
+      <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(280px,1fr))", gap:14, marginBottom:14 }}>
+        <div style={{ background:C.gradCard, border:`1px solid ${C.border}`, borderRadius:14, padding:"14px 16px 8px" }}>
+          <div style={{ fontWeight:700, fontSize:13, marginBottom:12 }}>By Category (Approved)</div>
+          {expByCat.length === 0
+            ? <ES text="No approved expenses in range" />
+            : <SmartChart data={expByCat} bars={["value"]} colors={PIE_COLORS} height={180} labelKey="name" />}
+        </div>
+        <div style={{ background:C.gradCard, border:`1px solid ${C.border}`, borderRadius:14, padding:"14px 16px 8px" }}>
+          <div style={{ fontWeight:700, fontSize:13, marginBottom:12 }}>Expenses Over Time</div>
+          <SmartChart data={expByDateData} bars={["Expenses (RWF)"]} colors={[C.warning]} height={180} />
+        </div>
+        <div style={{ background:C.gradCard, border:`1px solid ${C.border}`, borderRadius:14, padding:"14px 16px" }}>
+          <div style={{ fontWeight:700, fontSize:12, marginBottom:10 }}>Category Breakdown</div>
+          {expByCat.map((ec, i) =>
+            <div key={ec.name} style={{ display:"flex", justifyContent:"space-between", alignItems:"center",
+              padding:"5px 0", borderBottom:`1px solid ${C.border}15` }}>
+              <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+                <div style={{ width:8, height:8, borderRadius:"50%", background:PIE_COLORS[i % PIE_COLORS.length], flexShrink:0 }} />
+                <span style={{ fontSize:12, color:C.textMuted }}>{ec.name}</span>
+              </div>
+              <span style={{ fontSize:12, fontWeight:700, color:C.warning }}>{fmtRWF(ec.value)}</span>
+            </div>)}
+        </div>
+      </div>
+
+      <div style={{ background:C.gradCard, border:`1px solid ${C.border}`, borderRadius:14, overflow:"hidden" }}>
+        <div style={{ padding:"11px 16px", borderBottom:`1px solid ${C.border}`, fontWeight:700, fontSize:13,
+          display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+          <span>Expense Ledger ({fExpenses.length})</span>
+          <button onClick={() => exportExcel("expenses")} style={{ ...BtnS(C.success, true), fontSize:10, padding:"4px 10px" }}>⬇ CSV</button>
+        </div>
+        <ExpTable rows={fExpenses} full showStation cwsList={cwsList} />
+      </div>
+    </div>}
+
+    {/* ══ CASH & BANK REPORT ═════════════════════════════════════════ */}
+    {reportType === "cashbook" && <div>
+      <FilterCard>
+        <FBadge label="Cash Type" value={cashFilters.type} onChange={v => setCashFilters(p=>({...p,type:v}))}
+          options={["inflow","outflow"]} />
+        <FBadge label="Category" value={cashFilters.category} onChange={v => setCashFilters(p=>({...p,category:v}))}
+          options={uniqueCashCats} />
+        <FBadge label="Bank Type" value={bankFilters.type} onChange={v => setBankFilters(p=>({...p,type:v}))}
+          options={["credit","debit"]} />
+        <FSearch placeholder="Search description" value={cashFilters.description}
+          onChange={v => setCashFilters(p=>({...p,description:v}))} />
+        {(cashFilters.type !== "all" || cashFilters.category !== "all" || bankFilters.type !== "all" || cashFilters.description) &&
+          <button onClick={() => { setCashFilters({ type:"all", category:"all", description:"" }); setBankFilters({ type:"all", description:"" }); }}
+            style={{ ...BtnS(C.danger, false, true), fontSize:10, padding:"4px 8px" }}>✕</button>}
+      </FilterCard>
+
+      <div className="kpi-grid" style={{ marginBottom:14 }}>
+        <SC label="Cash Inflows"  value={fmtRWF(fCashbook.filter(c=>c.type==="inflow") .reduce((s,c)=>s+(+c.amount||0),0))} color={C.success} />
+        <SC label="Cash Outflows" value={fmtRWF(fCashbook.filter(c=>c.type==="outflow").reduce((s,c)=>s+(+c.amount||0),0))} color={C.danger}  />
+        <SC label="Bank Credits"  value={fmtRWF(fBank.filter(b=>b.type==="credit").reduce((s,b)=>s+(+b.amount||0),0))} color={C.info} />
+      </div>
+
+      <div style={{ background:C.gradCard, border:`1px solid ${C.border}`, borderRadius:14, padding:"14px 16px 8px", marginBottom:14 }}>
+        <div style={{ fontWeight:700, fontSize:13, marginBottom:12 }}>Cash Flow Over Time</div>
+        <SmartChart data={cashFlowData} bars={["Inflows","Outflows"]} colors={[C.success, C.danger]} height={190} />
+      </div>
+
+      <div style={{ background:C.gradCard, border:`1px solid ${C.border}`, borderRadius:14, overflow:"hidden", marginBottom:14 }}>
+        <div style={{ padding:"11px 16px", borderBottom:`1px solid ${C.border}`, fontWeight:700, fontSize:13,
+          display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+          <span>Cash Book ({fCashbook.length})</span>
+          <button onClick={() => exportExcel("cashbook")} style={{ ...BtnS(C.success, true), fontSize:10, padding:"4px 10px" }}>⬇ CSV</button>
+        </div>
+        <CashTable rows={fCashbook} />
+      </div>
+
+      <div style={{ background:C.gradCard, border:`1px solid ${C.border}`, borderRadius:14, overflow:"hidden" }}>
+        <div style={{ padding:"11px 16px", borderBottom:`1px solid ${C.border}`, fontWeight:700, fontSize:13 }}>
+          Bank Transactions ({fBank.length})
+        </div>
+        <BankTable rows={fBank} />
+      </div>
+    </div>}
+
+    {/* ══ STATION SUMMARY ════════════════════════════════════════════ */}
+    {reportType === "station_summary" && <div>
+      <div style={{ background:C.gradCard, border:`1px solid ${C.border}`, borderRadius:14, padding:"14px 16px 8px", marginBottom:14 }}>
+        <div style={{ fontWeight:700, fontSize:13, marginBottom:12 }}>Station Comparison</div>
+        <SmartChart data={cherryByStation} bars={["Cherry kg","Payments (k RWF)"]} colors={[C.coffee, C.gold]} height={200} labelKey="name" />
+      </div>
+
+      <div style={{ background:C.gradCard, border:`1px solid ${C.border}`, borderRadius:14, overflow:"hidden" }}>
+        <div style={{ padding:"11px 16px", borderBottom:`1px solid ${C.border}`, fontWeight:700, fontSize:13,
+          display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+          <span>Station Summary ({stationRows.length} stations)</span>
+          <button onClick={() => exportExcel("station_summary")} style={{ ...BtnS(C.success, true), fontSize:10, padding:"4px 10px" }}>⬇ CSV</button>
+        </div>
+        <div className="tbl-wrap"><table>
+          <thead><tr style={{ background:C.bgDeep }}>
+            {["Station","Region","Cherry kg","Farmers","Payments","Expenses","Cash Balance","Net"].map(h => <Th key={h}>{h}</Th>)}
+          </tr></thead>
+          <tbody>{stationRows.map(row => {
+            const net = row.cashBal - row.paid - row.exp;
+            return <tr key={row.cws.id}>
+              <Td style={{ color:C.coffeeLight, fontWeight:600 }}>☕ {row.cws.name}</Td>
+              <Td style={{ color:C.textMuted }}>{row.cws.region}</Td>
+              <Td style={{ fontWeight:700, color:C.coffee }}>{fmtKg(row.kg)}</Td>
+              <Td style={{ color:C.info }}>{row.farmers}</Td>
+              <Td style={{ color:C.success }}>{fmtRWF(row.paid)}</Td>
+              <Td style={{ color:C.warning }}>{fmtRWF(row.exp)}</Td>
+              <Td style={{ color:C.gold }}>{fmtRWF(row.cashBal)}</Td>
+              <Td style={{ color:net >= 0 ? C.success : C.danger, fontWeight:700 }}>{fmtRWF(net)}</Td>
+            </tr>;
+          })}</tbody>
+        </table></div>
+      </div>
+    </div>}
+
+    {/* ══ FUND REQUESTS ══════════════════════════════════════════════ */}
+    {reportType === "fund_requests" && <div>
+      <FilterCard>
+        <FBadge label="Status" value={frFilters.status} onChange={v => setFrFilters(p=>({...p,status:v}))}
+          options={["pending","pending_verification","pending_approval","approved","rejected"]} />
+        {frFilters.status !== "all" &&
+          <button onClick={() => setFrFilters({ status:"all" })}
+            style={{ ...BtnS(C.danger, false, true), fontSize:10, padding:"4px 8px" }}>✕</button>}
+      </FilterCard>
+
+      <div className="kpi-grid" style={{ marginBottom:14 }}>
+        <SC label="Total Requested" value={fmtRWF(fFR.reduce((s,f)=>s+(+f.amount||0),0))} color={C.gold} />
+        <SC label="Approved"        value={fmtRWF(fFR.filter(f=>f.status==="approved").reduce((s,f)=>s+(+f.amount||0),0))} color={C.success} />
+        <SC label="Pending"         value={fFR.filter(f=>f.status?.includes("pending")).length + " requests"} color={C.warning} />
+      </div>
+
+      <div style={{ background:C.gradCard, border:`1px solid ${C.border}`, borderRadius:14, overflow:"hidden" }}>
+        <div style={{ padding:"11px 16px", borderBottom:`1px solid ${C.border}`, fontWeight:700, fontSize:13,
+          display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+          <span>Fund Requests ({fFR.length})</span>
+          <button onClick={() => exportExcel("fund_requests")} style={{ ...BtnS(C.success, true), fontSize:10, padding:"4px 10px" }}>⬇ CSV</button>
+        </div>
+        <FundTable rows={fFR} users={users} cwsList={cwsList} />
+      </div>
+    </div>}
+
+    {/* ══ STOCK REPORT ═══════════════════════════════════════════════ */}
+    {reportType === "stock" && <div>
+      <FilterCard>
+        <FBadge label="Type" value={stockFilters.type} onChange={v => setStockFilters(p=>({...p,type:v}))}
+          options={[...new Set(stock.map(s => s.type).filter(Boolean))]} />
+        {stockFilters.type !== "all" &&
+          <button onClick={() => setStockFilters({ type:"all" })}
+            style={{ ...BtnS(C.danger, false, true), fontSize:10, padding:"4px 8px" }}>✕</button>}
+      </FilterCard>
+
+      <div className="kpi-grid" style={{ marginBottom:14 }}>
+        <SC label="Stock Items"  value={fStock.length} color={C.gold} />
+        <SC label="Total Value"  value={fmtRWF(totalStock)} color={C.success} />
+      </div>
+
+      <div style={{ background:C.gradCard, border:`1px solid ${C.border}`, borderRadius:14, overflow:"hidden" }}>
+        <div style={{ padding:"11px 16px", borderBottom:`1px solid ${C.border}`, fontWeight:700, fontSize:13,
+          display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+          <span>Stock Records ({fStock.length})</span>
+          <button onClick={() => exportExcel("stock")} style={{ ...BtnS(C.success, true), fontSize:10, padding:"4px 10px" }}>⬇ CSV</button>
+        </div>
+        <div className="tbl-wrap"><table>
+          <thead><tr style={{ background:C.bgDeep }}>
+            {["Date","Station","Type","Qty","Unit","Unit Price","Total Value","Notes"].map(h => <Th key={h}>{h}</Th>)}
+          </tr></thead>
+          <tbody>{fStock.map(s => {
+            const cws = cwsList.find(x => x.id === s.cwsId);
+            return <tr key={s.id}>
+              <Td>{s.date}</Td>
+              <Td style={{ color:C.textMuted }}>{cws?.name||s.cwsId}</Td>
+              <Td><SB status={s.type} /></Td>
+              <Td style={{ fontWeight:700 }}>{s.quantity}</Td>
+              <Td style={{ color:C.textMuted }}>{s.unit}</Td>
+              <Td>{fmtRWF(s.unitPrice)}</Td>
+              <Td style={{ color:C.gold, fontWeight:700 }}>{fmtRWF(s.totalValue)}</Td>
+              <Td style={{ color:C.textMuted, fontSize:11 }}>{s.notes||"—"}</Td>
+            </tr>;
+          })}</tbody>
+        </table></div>
+      </div>
+    </div>}
+
+    {/* ══ DEBTS REPORT ═══════════════════════════════════════════════ */}
+    {reportType === "debts" && <div>
+      <FilterCard>
+        <FBadge label="Status" value={debtFilters.status} onChange={v => setDebtFilters(p=>({...p,status:v}))}
+          options={["outstanding","partial","paid"]} />
+        <FBadge label="Farmer" value={debtFilters.farmer} onChange={v => setDebtFilters(p=>({...p,farmer:v}))}
+          options={farmerOptions} />
+        {(debtFilters.status !== "all" || debtFilters.farmer !== "all") &&
+          <button onClick={() => setDebtFilters({ status:"all", farmer:"all" })}
+            style={{ ...BtnS(C.danger, false, true), fontSize:10, padding:"4px 8px" }}>✕</button>}
+      </FilterCard>
+
+      <div className="kpi-grid" style={{ marginBottom:14 }}>
+        <SC label="Total Debts"       value={fStock.length ? fDebts.length : fDebts.length} color={C.danger} />
+        <SC label="Outstanding Balance" value={fmtRWF(totalDebts)} color={C.warning} />
+        <SC label="Paid Off"          value={fDebts.filter(d=>d.status==="paid").length + " debts"} color={C.success} />
+      </div>
+
+      <div style={{ background:C.gradCard, border:`1px solid ${C.border}`, borderRadius:14, overflow:"hidden" }}>
+        <div style={{ padding:"11px 16px", borderBottom:`1px solid ${C.border}`, fontWeight:700, fontSize:13,
+          display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+          <span>Debt Records ({fDebts.length})</span>
+          <button onClick={() => exportExcel("debts")} style={{ ...BtnS(C.success, true), fontSize:10, padding:"4px 10px" }}>⬇ CSV</button>
+        </div>
+        <div className="tbl-wrap"><table>
+          <thead><tr style={{ background:C.bgDeep }}>
+            {["Farmer","Station","Type","Amount","Balance","Status"].map(h => <Th key={h}>{h}</Th>)}
+          </tr></thead>
+          <tbody>{fDebts.map(d => {
+            const cws = cwsList.find(x => x.id === d.cwsId);
+            const f   = farmers2.find(x => x.id === d.farmerId);
+            return <tr key={d.id}>
+              <Td style={{ fontWeight:600 }}>{f?.name||d.farmerId}</Td>
+              <Td style={{ color:C.textMuted }}>{cws?.name||d.cwsId}</Td>
+              <Td style={{ color:C.textMuted }}>{d.type}</Td>
+              <Td>{fmtRWF(d.amount)}</Td>
+              <Td style={{ color:C.danger, fontWeight:700 }}>{fmtRWF(d.balance)}</Td>
+              <Td><SB status={d.status} /></Td>
+            </tr>;
+          })}</tbody>
+        </table></div>
+      </div>
+    </div>}
+  </div>;
 }
+
+
 function MachineryPage() {
   const { currentUser: u, machines, setMachines, tasks, setTasks, machTx, setMachTx, driverLogs, leaves, setLeaves, users, setUsers, assistants, setAssistants, online, pending, setPending, addNote } = useApp();
   const [tab, setTab] = useState("fleet");
@@ -3002,7 +3402,14 @@ function MachineryPage() {
     const driver = users.find((x) => x.id === m.driverId);
     const asst = assistants.find((a) => a.machineId === m.id);
     const activeTask = tasks.find((t) => t.machineId === m.id && t.status === "active");
-    return <div key={m.id} style={{ background: `linear-gradient(145deg,${C.machineryBg},${C.bgCard})`, border: `1px solid ${C.machinery}35`, borderRadius: 13, padding: "18px", animation: `fadeUp .3s ease ${i * 0.08}s both` }}>
+    return <div key={m.id} style={{ background: `linear-gradient(145deg,${C.machineryBg},${C.bgCard})`, border: `1px solid ${C.machinery}35`, borderRadius: 13, overflow: "hidden", animation: `fadeUp .3s ease ${i * 0.08}s both` }}>
+              {m.image
+                ? <div style={{ height: 80, position: "relative" }}>
+                    <img src={m.image} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                    <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to bottom, transparent 40%, rgba(0,0,0,.6))" }} />
+                  </div>
+                : null}
+              <div style={{ padding: "14px 16px" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
                 <div><div style={{ fontFamily: "'Inter',sans-serif", fontSize: 14, fontWeight: 700, color: C.machineryLight }}>{m.name}</div><div style={{ fontSize: 11, color: C.textMuted }}>{m.type} · {m.plate}</div></div>
                 <SPill status={m.status} />
@@ -3010,6 +3417,7 @@ function MachineryPage() {
               <div style={{ fontSize: 12, color: C.textMuted, marginBottom: 8 }}>🧑‍💼 <span style={{ color: C.text }}>{driver?.name || "No driver"}</span><br />🔧 <span style={{ color: C.text }}>{asst?.name || "No assistant"}</span></div>
               {activeTask && <div style={{ padding: "8px 10px", background: `${C.machinery}10`, borderRadius: 7, fontSize: 11, marginBottom: 8 }}><div style={{ color: C.machineryLight, fontWeight: 700 }}>{activeTask.customer}</div><div style={{ color: C.textMuted }}>{activeTask.district}, {activeTask.province}</div><div style={{ color: C.gold }}>{fmtRWF(activeTask.hourlyRate)}/hr</div></div>}
               {canManage && m.status === "available" && <button onClick={() => setShowAddTask(m.id)} style={{ ...BtnS(C.machinery, true), width: "100%", justifyContent: "center", fontSize: 11, padding: "5px", marginTop: 8 }}>+ Assign Task</button>}
+              </div>{/* end padding div */}
             </div>;
   })}
         </div>}
@@ -3078,25 +3486,25 @@ function MachineryPage() {
         </div>}
       {showAddTask && <Modal title="Assign Task to Machine" onClose={() => setShowAddTask(null)} wide><div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(180px,1fr))", gap: 11 }}><FI label="Customer" value={taskForm.customer} onChange={(v) => setTaskForm((p) => ({ ...p, customer: v }))} placeholder="Organisation name" /><div><FL>Province</FL><select value={taskForm.province} onChange={(e) => setTaskForm((p) => ({ ...p, province: e.target.value }))} style={selS()}>{PROVINCES.map((pv) => <option key={pv}>{pv}</option>)}</select></div><FI label="District" value={taskForm.district} onChange={(v) => setTaskForm((p) => ({ ...p, district: v }))} placeholder="District" /><FI label="Sector" value={taskForm.sector} onChange={(v) => setTaskForm((p) => ({ ...p, sector: v }))} placeholder="Sector" /><FI label="Start Date" type="date" value={taskForm.startDate} onChange={(v) => setTaskForm((p) => ({ ...p, startDate: v }))} /><FI label="End Date" type="date" value={taskForm.endDate} onChange={(v) => setTaskForm((p) => ({ ...p, endDate: v }))} /><FI label="Hourly Rate (RWF)" type="number" value={taskForm.hourlyRate} onChange={(v) => setTaskForm((p) => ({ ...p, hourlyRate: v }))} placeholder="45000" /><FI label="Notes" value={taskForm.notes} onChange={(v) => setTaskForm((p) => ({ ...p, notes: v }))} placeholder="Optional" /></div><MF onCancel={() => setShowAddTask(null)} onSave={() => {
     if (!taskForm.customer) return;
-    setTasks((p) => [...p, { ...taskForm, id: `t${Date.now()}`, machineId: showAddTask, status: "active", totalHours: 0, hourlyRate: +taskForm.hourlyRate }]);
+    setTasks((p) => [...p, { ...taskForm, id: uid(), machineId: showAddTask, status: "active", totalHours: 0, hourlyRate: +taskForm.hourlyRate }]);
     setMachines((p) => p.map((m) => m.id === showAddTask ? { ...m, status: "on_task" } : m));
     setShowAddTask(null);
     addNote("Task assigned", "success");
   }} label="Assign Task" color={C.machinery} /></Modal>}
-      {showAddMachine && <Modal title="Add Machine" onClose={() => setShowAddMachine(false)}><div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(180px,1fr))", gap: 11 }}><FI label="Machine Name" value={machForm.name} onChange={(v) => setMachForm((p) => ({ ...p, name: v }))} placeholder="e.g. CAT 320" /><FI label="Type" value={machForm.type} onChange={(v) => setMachForm((p) => ({ ...p, type: v }))} placeholder="Excavator" /><FI label="Plate Number" value={machForm.plate} onChange={(v) => setMachForm((p) => ({ ...p, plate: v }))} placeholder="RAC 000X" /><div><FL>Assign Driver</FL><select value={machForm.driverId} onChange={(e) => setMachForm((p) => ({ ...p, driverId: e.target.value }))} style={selS()}><option value="">— None —</option>{users.filter((x) => x.role === "driver").map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}</select></div></div><MF onCancel={() => setShowAddMachine(false)} onSave={() => {
+      {showAddMachine && <Modal title="Add Machine" onClose={() => setShowAddMachine(false)}><div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(180px,1fr))", gap: 11 }}><FI label="Machine Name" value={machForm.name} onChange={(v) => setMachForm((p) => ({ ...p, name: v }))} placeholder="e.g. CAT 320" /><FI label="Type" value={machForm.type} onChange={(v) => setMachForm((p) => ({ ...p, type: v }))} placeholder="Excavator" /><FI label="Plate Number" value={machForm.plate} onChange={(v) => setMachForm((p) => ({ ...p, plate: v }))} placeholder="RAC 000X" /><div><FL>Assign Driver</FL><select value={machForm.driverId} onChange={(e) => setMachForm((p) => ({ ...p, driverId: e.target.value }))} style={selS()}><option value="">— None —</option>{users.filter((x) => x.role === "driver").map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}</select></div><div style={{ gridColumn: "1/-1" }}><ImagePicker label="Machine Photo" value={machForm.image||""} onChange={(v) => setMachForm((p) => ({ ...p, image: v }))} height={90} /></div></div><MF onCancel={() => setShowAddMachine(false)} onSave={() => {
     if (!machForm.name) return;
-    setMachines((p) => [...p, { ...machForm, id: `m${Date.now()}`, status: "available" }]);
+    setMachines((p) => [...p, { ...machForm, id: uid(), status: "available" }]);
     setShowAddMachine(false);
   }} label="Add Machine" color={C.machinery} /></Modal>}
       {showAddDriver && <Modal title="Add Driver" onClose={() => setShowAddDriver(false)}><div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(180px,1fr))", gap: 11 }}><FI label="Full Name" value={drvForm.name} onChange={(v) => setDrvForm((p) => ({ ...p, name: v }))} placeholder="Driver's full name" /><FI label="Email" type="email" value={drvForm.email} onChange={(v) => setDrvForm((p) => ({ ...p, email: v }))} placeholder="driver@bender.rw" /><FI label="Password" type="password" value={drvForm.password} onChange={(v) => setDrvForm((p) => ({ ...p, password: v }))} placeholder="••••••" /><div><FL>Assign Machine</FL><select value={drvForm.machineId} onChange={(e) => setDrvForm((p) => ({ ...p, machineId: e.target.value }))} style={selS()}><option value="">— None —</option>{machines.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}</select></div></div><MF onCancel={() => setShowAddDriver(false)} onSave={() => {
     if (!drvForm.name || !drvForm.email) return;
-    setUsers((p) => [...p, { ...drvForm, id: `u${Date.now()}`, role: "driver", cwsAccess: [], machineId: drvForm.machineId || null, avatar: drvForm.name.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase(), createdAt: today(), active: true }]);
+    setUsers((p) => [...p, { ...drvForm, id: uid(), role: "driver", cwsAccess: [], machineId: drvForm.machineId || null, avatar: drvForm.name.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase(), createdAt: today(), active: true }]);
     setShowAddDriver(false);
     addNote(`Driver ${drvForm.name} created`, "success");
   }} label="Create Driver" color={C.machinery} /></Modal>}
       {showAddTx && <Modal title="Add Machine Transaction" onClose={() => setShowAddTx(false)}><div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(180px,1fr))", gap: 11 }}><FI label="Date" type="date" value={txForm.date} onChange={(v) => setTxForm((p) => ({ ...p, date: v }))} /><div><FL>Machine</FL><select value={txForm.machineId} onChange={(e) => setTxForm((p) => ({ ...p, machineId: e.target.value }))} style={selS()}><option value="">— Select —</option>{machines.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}</select></div><div><FL>Type</FL><select value={txForm.type} onChange={(e) => setTxForm((p) => ({ ...p, type: e.target.value, category: TX_CATS[e.target.value][0] }))} style={selS()}><option value="income">Income</option><option value="expense">Expense</option></select></div><div><FL>Category</FL><select value={txForm.category} onChange={(e) => setTxForm((p) => ({ ...p, category: e.target.value }))} style={selS()}>{(TX_CATS[txForm.type] || []).map((c) => <option key={c}>{c}</option>)}</select></div><FI label="Amount (RWF)" type="number" value={txForm.amount} onChange={(v) => setTxForm((p) => ({ ...p, amount: v }))} placeholder="0" /><FI label="Description" value={txForm.desc} onChange={(v) => setTxForm((p) => ({ ...p, desc: v }))} placeholder="Description..." /></div><MF onCancel={() => setShowAddTx(false)} onSave={() => {
     if (!txForm.amount || !txForm.machineId) return;
-    setMachTx((p) => [{ ...txForm, id: `mt${Date.now()}`, amount: +txForm.amount, status: online ? "synced" : "offline" }, ...p]);
+    setMachTx((p) => [{ ...txForm, id: uid(), amount: +txForm.amount, status: online ? "synced" : "offline" }, ...p]);
     setShowAddTx(false);
   }} label="Save Transaction" color={C.machinery} /></Modal>}
     </div>;
@@ -3141,12 +3549,12 @@ function DriverHome() {
       </div>
       {showLog && <Modal title="Submit Daily Log" onClose={() => setShowLog(false)}><div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(180px,1fr))", gap: 11 }}><FI label="Date" type="date" value={log.date} onChange={(v) => setLog((p) => ({ ...p, date: v }))} /><FI label="Hours Worked" type="number" value={log.hours} onChange={(v) => setLog((p) => ({ ...p, hours: v }))} placeholder="8" /><FI label="Fuel Received (L)" type="number" value={log.fuelReceived} onChange={(v) => setLog((p) => ({ ...p, fuelReceived: v }))} placeholder="0" /><FI label="Task Location" value={log.taskLocation} onChange={(v) => setLog((p) => ({ ...p, taskLocation: v }))} placeholder="District, Sector" /><div><FL>Machine Condition</FL><select value={log.condition} onChange={(e) => setLog((p) => ({ ...p, condition: e.target.value }))} style={selS()}>{["good", "fair", "needs_repair", "critical"].map((c) => <option key={c} value={c}>{c.replace(/_/g, " ")}</option>)}</select></div><FI label="Comments" value={log.comments} onChange={(v) => setLog((p) => ({ ...p, comments: v }))} placeholder="Notes..." /></div><MF onCancel={() => setShowLog(false)} onSave={() => {
     if (!log.hours) return;
-    setDriverLogs((p) => [{ ...log, id: `dl${Date.now()}`, driverId: u.id, machineId: u.machineId, hours: +log.hours, fuelReceived: +log.fuelReceived, status: "submitted" }, ...p]);
+    setDriverLogs((p) => [{ ...log, id: uid(), driverId: u.id, machineId: u.machineId, hours: +log.hours, fuelReceived: +log.fuelReceived, status: "submitted" }, ...p]);
     setShowLog(false);
   }} label="Submit Log" color={C.machinery} /></Modal>}
       {showLeave && <Modal title="Request Leave / Off Day" onClose={() => setShowLeave(false)}><div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(180px,1fr))", gap: 11 }}><div><FL>Leave Type</FL><select value={leave.type} onChange={(e) => setLeave((p) => ({ ...p, type: e.target.value }))} style={selS()}><option value="off_day">Off Day</option><option value="sick_leave">Sick Leave</option><option value="annual_leave">Annual Leave</option></select></div><FI label="Date" type="date" value={leave.date} onChange={(v) => setLeave((p) => ({ ...p, date: v }))} /><div style={{ gridColumn: "1/-1" }}><FI label="Reason" value={leave.reason} onChange={(v) => setLeave((p) => ({ ...p, reason: v }))} placeholder="Reason for leave..." /></div></div><MF onCancel={() => setShowLeave(false)} onSave={() => {
     if (!leave.date) return;
-    setLeaves((p) => [...p, { ...leave, id: `lv${Date.now()}`, driverId: u.id, status: "pending" }]);
+    setLeaves((p) => [...p, { ...leave, id: uid(), driverId: u.id, status: "pending" }]);
     setShowLeave(false);
   }} label="Submit Request" color={C.machinery} /></Modal>}
     </div>;
@@ -3243,7 +3651,7 @@ function UsersPage() {
       if (!form.password) return;
       const created = {
         ...form,
-        id:         `u${Date.now()}`,
+        id:         uid(),
         avatar:     form.name.split(" ").map(w => w[0]).join("").slice(0,2).toUpperCase(),
         createdAt:  today(),
         active:     true,
@@ -3313,14 +3721,14 @@ function UsersPage() {
     </div>;
 }
 function SystemPage() {
-  const { system, setSystem, cwsList, setCwsList, addNote } = useApp();
+  const { system, setSystem, cwsList, setCwsList, addNote, syncToServer } = useApp();
   const [tab, setTab] = useState("branding");
   const [labels, setLabels] = useState({ ...system.labels });
-  const [newCWS, setNewCWS] = useState({ name: "", region: "" });
+  const [newCWS, setNewCWS] = useState({ name: "", region: "", image: "" });
   return <div>
       <div style={{ fontFamily: "'Inter',sans-serif", fontSize: 22, letterSpacing: '-0.4px', fontWeight: 700, color: C.text, marginBottom: 6 }}>System Configuration</div>
       <div style={{ fontSize: 13, color: C.textMuted, marginBottom: 18 }}>Super Admin settings — rename modules, manage stations, configure branding.</div>
-      <Tabs tabs={["branding", "labels", "stations"]} labels={["Branding", "Module Labels", "Washing Stations"]} active={tab} onChange={setTab} />
+      <Tabs tabs={["branding", "units", "labels", "stations"]} labels={["Branding", "Business Units", "Module Labels", "Washing Stations"]} active={tab} onChange={setTab} />
       {tab === "branding" && <div style={{ maxWidth: 480 }}>
           <FI label="Company Name" value={system.companyName} onChange={(v) => setSystem((p) => ({ ...p, companyName: v }))} />
           <div style={{ marginTop: 11 }}><FI label="Tagline" value={system.tagline} onChange={(v) => setSystem((p) => ({ ...p, tagline: v }))} /></div>
@@ -3364,22 +3772,43 @@ function SystemPage() {
             />
             <div style={{ fontSize: 11, color: C.textDim, marginTop: 6 }}>Recommended: landscape photo, 1920×1080 or larger.</div>
           </div>
-          <button onClick={async () => {
-            try {
-              const res = await apiFetch("/api/system", {
-                method: "PUT",
-                body: JSON.stringify({
-                  companyName:    system.companyName,
-                  tagline:        system.tagline,
-                  heroImageUrl:   system.heroImageUrl,
-                  businessModels: system.businessModels,
-                }),
-              });
-              if (!res.ok) { const e = await res.json().catch(()=>({})); throw new Error(e.error||"Save failed"); }
-              DB.save("system", system);
-              addNote("Branding saved ✓", "success");
-            } catch(err) { addNote("Save failed: " + err.message, "danger"); }
-          }} style={{ ...BtnS(C.gold), marginTop: 20, padding: "8px 20px", fontSize: 12 }}>💾 Save Branding</button>
+          <button onClick={async () => { await syncToServer("system", system); addNote("Branding saved ✓", "success"); }} style={{ ...BtnS(C.gold), marginTop: 20, padding: "8px 20px", fontSize: 12 }}>💾 Save Branding</button>
+        </div>}
+      {tab === "units" && <div style={{ maxWidth: 560 }}>
+          <div style={{ fontSize: 13, color: C.textMuted, marginBottom: 16 }}>Set a cover image for each business unit card on the dashboard. Recommended: landscape, 1200×600+.</div>
+          <div style={{ display: "grid", gap: 20 }}>
+            {(system.businessModels || []).map((m) => {
+              const colors = {
+                coffee:       { color: C.coffee,       light: C.coffeeLight,       bg: C.coffeeBg },
+                machinery:    { color: C.machinery,     light: C.machineryLight,    bg: C.machineryBg },
+                construction: { color: C.construction,  light: C.constructionLight, bg: C.constructionBg },
+              };
+              const col = colors[m.id] || { color: C.gold, light: C.goldLight, bg: C.bgDeep };
+              return <div key={m.id} style={{ background: C.gradCard, border: `1px solid ${col.color}28`, borderRadius: 14, overflow: "hidden" }}>
+                {/* Mini card preview */}
+                <div style={{ height: 90, position: "relative", background: col.bg }}>
+                  {m.image
+                    ? <img src={m.image} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                    : <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 36, opacity: .15 }}>{m.icon}</div>}
+                  <div style={{ position: "absolute", inset: 0, background: `linear-gradient(to bottom, transparent 30%, ${col.bg}DD)` }} />
+                  <div style={{ position: "absolute", bottom: 8, left: 14, fontSize: 14, fontWeight: 700, color: col.light }}>{m.icon} {m.label}</div>
+                </div>
+                {/* Image picker */}
+                <div style={{ padding: "14px 16px" }}>
+                  <ImagePicker
+                    label="Unit Image"
+                    value={m.image || ""}
+                    onChange={(v) => setSystem(p => ({
+                      ...p,
+                      businessModels: (p.businessModels || []).map(bm => bm.id === m.id ? { ...bm, image: v } : bm)
+                    }))}
+                    height={80}
+                  />
+                </div>
+              </div>;
+            })}
+          </div>
+          <button onClick={async () => { await syncToServer("system", system); addNote("Unit images saved ✓", "success"); }} style={{ ...BtnS(C.gold), marginTop: 20, padding: "8px 20px", fontSize: 12 }}>💾 Save Unit Images</button>
         </div>}
       {tab === "labels" && <div style={{ maxWidth: 480 }}>
           <div style={{ display: "grid", gap: 11 }}>
@@ -3392,12 +3821,31 @@ function SystemPage() {
         </div>}
       {tab === "stations" && <div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(130px,1fr))", gap: 12, marginBottom: 18 }}>
-            {cwsList.map((cws) => <div key={cws.id} style={{ background: C.gradCard, border: `1px solid ${C.coffee}28`, borderRadius: 11, padding: "14px 16px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <div><div style={{ fontWeight: 600, color: C.coffeeLight }}>{cws.name}</div><div style={{ fontSize: 11, color: C.textMuted }}>{cws.region}</div></div>
-                <button onClick={() => {
-    setCwsList((p) => p.filter((c) => c.id !== cws.id));
-    addNote(`${cws.name} removed`, "warning");
-  }} style={{ ...BtnS(C.danger, false, true), fontSize: 10, padding: "3px 8px" }}>Remove</button>
+            {cwsList.map((cws) => <div key={cws.id} style={{ background: C.gradCard, border: `1px solid ${C.coffee}28`, borderRadius: 11, overflow: "hidden" }}>
+                {/* Thumbnail strip */}
+                <div style={{ height: 70, position: "relative", background: C.bgDeep, cursor: "pointer" }} onClick={() => document.getElementById(`cws-img-${cws.id}`).click()}>
+                  {cws.image
+                    ? <img src={cws.image} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                    : <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: C.textDim, fontSize: 11 }}>🖼 Add photo</div>}
+                  <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,.35)", display: "flex", alignItems: "center", justifyContent: "center", opacity: 0, transition: ".15s" }}
+                    onMouseEnter={e => e.currentTarget.style.opacity = 1}
+                    onMouseLeave={e => e.currentTarget.style.opacity = 0}>
+                    <span style={{ color: "#fff", fontSize: 11, fontWeight: 600, background: "rgba(0,0,0,.5)", padding: "3px 8px", borderRadius: 5 }}>✏ Change</span>
+                  </div>
+                  <input type="file" id={`cws-img-${cws.id}`} accept="image/*" style={{ display: "none" }} onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    if (file.size > 5 * 1024 * 1024) { alert("Max 5 MB"); return; }
+                    const reader = new FileReader();
+                    reader.onload = (ev) => { setCwsList(p => p.map(c => c.id === cws.id ? { ...c, image: ev.target.result } : c)); };
+                    reader.readAsDataURL(file);
+                    e.target.value = "";
+                  }} />
+                </div>
+                <div style={{ padding: "10px 14px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <div><div style={{ fontWeight: 600, color: C.coffeeLight, fontSize: 13 }}>{cws.name}</div><div style={{ fontSize: 11, color: C.textMuted }}>{cws.region}</div></div>
+                  <button onClick={() => { setCwsList((p) => p.filter((c) => c.id !== cws.id)); addNote(`${cws.name} removed`, "warning"); }} style={{ ...BtnS(C.danger, false, true), fontSize: 10, padding: "3px 8px" }}>Remove</button>
+                </div>
               </div>)}
           </div>
           <div style={{ background: C.gradCard, border: `1px solid ${C.border}`, borderRadius: 14, padding: "16px 18px", maxWidth: 400 }}>
@@ -3405,17 +3853,500 @@ function SystemPage() {
             <div style={{ display: "grid", gap: 11 }}>
               <FI label="Station Name" value={newCWS.name} onChange={(v) => setNewCWS((p) => ({ ...p, name: v }))} placeholder="e.g. Rwamagana CWS" />
               <FI label="Region" value={newCWS.region} onChange={(v) => setNewCWS((p) => ({ ...p, region: v }))} placeholder="Province / Region" />
+              <ImagePicker label="Station Image" value={newCWS.image} onChange={(v) => setNewCWS((p) => ({ ...p, image: v }))} height={100} />
             </div>
             <button onClick={() => {
     if (!newCWS.name) return;
-    setCwsList((p) => [...p, { ...newCWS, id: newCWS.name.toLowerCase().replace(/\s+cws$/, "").replace(/\s+/g, "_"), image: "https://images.unsplash.com/photo-1559305616-3f99cd43e353?w=600&q=70" }]);
-    setNewCWS({ name: "", region: "" });
+    setCwsList((p) => [...p, { ...newCWS, id: newCWS.name.toLowerCase().replace(/\s+cws$/, "").replace(/\s+/g, "_") }]);
+    setNewCWS({ name: "", region: "", image: "" });
     addNote(`${newCWS.name} added`, "success");
   }} style={{ ...BtnS(C.coffee), marginTop: 12, fontSize: 12, padding: "7px 14px" }}>+ Add Station</button>
           </div>
         </div>}
     </div>;
 }
+
+// ════════════════════════════════════════════════════════════════════
+// EXCEL IMPORT PAGE
+// Uses SheetJS (loaded from CDN) to parse .xlsx/.csv files in the
+// browser, fuzzy-matches columns to known fields, previews data,
+// then saves matching records directly to Supabase via the app's
+// existing setters (mkSet → syncToServer).
+// ════════════════════════════════════════════════════════════════════
+
+// Field schemas for every importable table.
+// aliases: alternative column headers users might use in their Excel.
+// required: if true, a row is skipped when this field is blank.
+// type: coercion applied after matching.
+const IMPORT_SCHEMAS = {
+  farmers: {
+    label: "Farmers",
+    icon: "👨‍🌾",
+    fields: [
+      { key: "name",      aliases: ["name","farmer name","full name","nom"],            required: true,  type: "str" },
+      { key: "farmerId",  aliases: ["farmer id","code","farmer code","id code","code"], required: false, type: "str" },
+      { key: "group",     aliases: ["group","groupe","cooperative","coop"],             required: false, type: "str" },
+      { key: "phone",     aliases: ["phone","tel","telephone","contact","mobile"],      required: false, type: "str" },
+    ],
+    build: (row, ctx) => ({
+      id: uid(), cwsId: ctx.cwsId, balance: 0,
+      createdAt: today(), active: true,
+      ...row,
+    }),
+  },
+  cherry: {
+    label: "Cherry / GNR",
+    icon: "🍒",
+    fields: [
+      { key: "gnrNumber",   aliases: ["gnr","gnr number","gnr no","numero","receipt no"], required: true,  type: "str" },
+      { key: "farmerId",    aliases: ["farmer id","farmer code","code"],                  required: false, type: "str" },
+      { key: "date",        aliases: ["date","harvest date","reception date"],            required: false, type: "date" },
+      { key: "standardKg",  aliases: ["standard kg","std kg","standard","poids std"],    required: true,  type: "num" },
+      { key: "flotantKg",   aliases: ["flotant kg","flt kg","flotant","poids flt"],      required: false, type: "num" },
+      { key: "rateStandard",aliases: ["rate std","standard rate","taux std","rate"],     required: false, type: "num" },
+      { key: "rateFlotant", aliases: ["rate flt","flotant rate","taux flt"],             required: false, type: "num" },
+      { key: "notes",       aliases: ["notes","note","remarks","commentaires"],          required: false, type: "str" },
+    ],
+    build: (row, ctx) => {
+      const stdKg  = +(row.standardKg || 0);
+      const fltKg  = +(row.flotantKg  || 0);
+      const rateS  = +(row.rateStandard || ctx.season?.rateStandard || 155);
+      const rateF  = +(row.rateFlotant  || ctx.season?.rateFlotant  || 80);
+      return {
+        id: uid(), cwsId: ctx.cwsId, status: "pending",
+        paymentMethod: null, paidBy: null, paidAt: null,
+        by: ctx.userId, date: row.date || today(),
+        standardKg: stdKg, flotantKg: fltKg,
+        totalKg: stdKg + fltKg,
+        rateStandard: rateS, rateFlotant: rateF,
+        totalPaid: (stdKg * rateS) + (fltKg * rateF),
+        gnrNumber: row.gnrNumber, farmerId: row.farmerId || "",
+        notes: row.notes || "",
+      };
+    },
+  },
+  cashbook: {
+    label: "Cash Book",
+    icon: "💵",
+    fields: [
+      { key: "date",        aliases: ["date","transaction date"],                        required: true,  type: "date" },
+      { key: "type",        aliases: ["type","flow","inflow outflow"],                  required: true,  type: "str" },
+      { key: "category",    aliases: ["category","categorie","type of expense"],        required: false, type: "str" },
+      { key: "description", aliases: ["description","details","memo","narration"],      required: false, type: "str" },
+      { key: "amount",      aliases: ["amount","montant","rwf","value"],               required: true,  type: "num" },
+      { key: "ref",         aliases: ["ref","reference","receipt","voucher"],          required: false, type: "str" },
+    ],
+    build: (row, ctx) => ({
+      id: uid(), cwsId: ctx.cwsId, balance: 0, by: ctx.userId,
+      type: (row.type||"").toLowerCase().includes("out") ? "outflow" : "inflow",
+      ...row, amount: +(row.amount||0),
+    }),
+  },
+  expenses: {
+    label: "Expenses",
+    icon: "🧾",
+    fields: [
+      { key: "date",        aliases: ["date"],                                          required: true,  type: "date" },
+      { key: "category",    aliases: ["category","categorie","type"],                  required: false, type: "str" },
+      { key: "description", aliases: ["description","details","memo"],                 required: false, type: "str" },
+      { key: "amount",      aliases: ["amount","montant","rwf"],                      required: true,  type: "num" },
+    ],
+    build: (row, ctx) => ({
+      id: uid(), cwsId: ctx.cwsId, status: "pending", by: ctx.userId,
+      exploitable: true, ...row, amount: +(row.amount||0),
+    }),
+  },
+  debts: {
+    label: "Debts / Liabilities",
+    icon: "📋",
+    fields: [
+      { key: "date",        aliases: ["date"],                                          required: true,  type: "date" },
+      { key: "party",       aliases: ["party","person","name","debtor","creditor"],    required: true,  type: "str" },
+      { key: "type",        aliases: ["type","debt type"],                             required: false, type: "str" },
+      { key: "description", aliases: ["description","details","memo"],                 required: false, type: "str" },
+      { key: "amount",      aliases: ["amount","montant","rwf"],                      required: true,  type: "num" },
+    ],
+    build: (row, ctx) => ({
+      id: uid(), cwsId: ctx.cwsId, status: "outstanding",
+      balance: +(row.amount||0),
+      type: row.type || "debt_given",
+      ...row, amount: +(row.amount||0),
+    }),
+  },
+  machines: {
+    label: "Machines",
+    icon: "🏗️",
+    fields: [
+      { key: "name",   aliases: ["name","machine name","machine","equipment"],       required: true,  type: "str" },
+      { key: "type",   aliases: ["type","machine type","category"],                  required: false, type: "str" },
+      { key: "plate",  aliases: ["plate","plate number","plate no","plaque"],        required: false, type: "str" },
+      { key: "notes",  aliases: ["notes","note","remarks"],                          required: false, type: "str" },
+    ],
+    build: (row) => ({ id: uid(), status: "available", driverId: null, image: "", ...row }),
+  },
+  contractors: {
+    label: "Contractors",
+    icon: "👷",
+    fields: [
+      { key: "name",    aliases: ["name","contractor","company","firm"],               required: true,  type: "str" },
+      { key: "contact", aliases: ["contact","phone","tel","email"],                   required: false, type: "str" },
+      { key: "type",    aliases: ["type","specialty","category","service"],           required: false, type: "str" },
+      { key: "notes",   aliases: ["notes","note","remarks"],                          required: false, type: "str" },
+    ],
+    build: (row) => ({ id: uid(), active: true, createdAt: today(), ...row }),
+  },
+  projects: {
+    label: "Projects",
+    icon: "🏛️",
+    fields: [
+      { key: "name",       aliases: ["name","project name","project","titre"],        required: true,  type: "str" },
+      { key: "startDate",  aliases: ["start date","start","debut"],                  required: false, type: "date" },
+      { key: "endDate",    aliases: ["end date","end","fin"],                         required: false, type: "date" },
+      { key: "budget",     aliases: ["budget","cost","montant"],                     required: false, type: "num" },
+      { key: "status",     aliases: ["status","statut","state"],                     required: false, type: "str" },
+      { key: "notes",      aliases: ["notes","description","details"],               required: false, type: "str" },
+    ],
+    build: (row) => ({
+      id: uid(), status: row.status || "planned",
+      budget: +(row.budget||0), spent: 0,
+      contractorId: null, createdAt: today(), ...row,
+    }),
+  },
+};
+
+// Normalise a header string for fuzzy matching
+const normHeader = (s) => (s||"").toLowerCase().replace(/[^a-z0-9]/g, " ").replace(/\s+/g, " ").trim();
+
+// Match Excel columns to schema fields.
+// Returns { fieldKey: colIndex } for every field that has a match.
+function matchColumns(headers, fields) {
+  const norm = headers.map(normHeader);
+  const result = {};
+  for (const f of fields) {
+    const aliases = [f.key, ...f.aliases].map(normHeader);
+    const idx = norm.findIndex(h => aliases.some(a => h === a || h.includes(a) || a.includes(h)));
+    if (idx >= 0) result[f.key] = idx;
+  }
+  return result;
+}
+
+// Coerce a cell value to the target type
+function coerce(val, type) {
+  if (val === null || val === undefined || val === "") return "";
+  switch (type) {
+    case "num":  return isNaN(+val) ? 0 : +val;
+    case "date": {
+      // SheetJS dates come as JS Date objects or serial numbers
+      if (val instanceof Date) return val.toISOString().split("T")[0];
+      if (typeof val === "number") {
+        // Excel serial date: days since 1899-12-30
+        const d = new Date(Math.round((val - 25569) * 86400 * 1000));
+        return d.toISOString().split("T")[0];
+      }
+      const d = new Date(val);
+      return isNaN(d) ? String(val) : d.toISOString().split("T")[0];
+    }
+    default: return String(val).trim();
+  }
+}
+
+function ImportPage() {
+  const { currentUser: u, cwsList, farmers: farmers2, setFarmers, cherry, setCherry,
+          cashbook, setCashbook, expenses, setExpenses, debts, setDebts,
+          machines, setMachines, contractors, setContractors,
+          projects, setProjects, seasons, addNote } = useApp();
+
+  const [step, setStep]         = useState("pick");   // pick | map | preview | done
+  const [tableKey, setTableKey] = useState("farmers");
+  const [cwsId, setCwsId]       = useState("");
+  const [rows, setRows]         = useState([]);        // raw parsed rows from Excel
+  const [headers, setHeaders]   = useState([]);
+  const [colMap, setColMap]     = useState({});        // { fieldKey: colIndex }
+  const [preview, setPreview]   = useState([]);        // built records ready to save
+  const [skipped, setSkipped]   = useState([]);
+  const [fileName, setFileName] = useState("");
+  const [loading, setLoading]   = useState(false);
+
+  const schema  = IMPORT_SCHEMAS[tableKey];
+  const activeSeason = seasons.find(s => s.status === "active");
+  const accessibleCws = canSeeAllStations(u.role) ? cwsList : cwsList.filter(c => (u.cwsAccess||[]).includes(c.id));
+
+  // ── Step 1: Parse uploaded file ──────────────────────────────────────
+  const handleFile = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setFileName(file.name);
+    setLoading(true);
+
+    // Dynamically load SheetJS from CDN if not already present
+    if (!window.XLSX) {
+      await new Promise((res, rej) => {
+        const s = document.createElement("script");
+        s.src = "https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js";
+        s.onload = res; s.onerror = rej;
+        document.head.appendChild(s);
+      });
+    }
+
+    const buf  = await file.arrayBuffer();
+    const wb   = window.XLSX.read(buf, { type: "array", cellDates: true });
+    const ws   = wb.Sheets[wb.SheetNames[0]];
+    const data = window.XLSX.utils.sheet_to_json(ws, { header: 1, defval: "" });
+
+    if (!data.length) { addNote("File appears to be empty", "danger"); setLoading(false); return; }
+
+    const hdrs = (data[0] || []).map(String);
+    const body = data.slice(1).filter(r => r.some(c => c !== "" && c !== null));
+
+    setHeaders(hdrs);
+    setRows(body);
+    setColMap(matchColumns(hdrs, schema.fields));
+    setStep("map");
+    setLoading(false);
+  };
+
+  // ── Step 2: Build preview from current column mapping ─────────────
+  const buildPreview = () => {
+    const ctx = { cwsId, userId: u.id, season: activeSeason };
+    const good = [], bad = [];
+
+    for (let i = 0; i < rows.length; i++) {
+      const raw = {};
+      for (const f of schema.fields) {
+        if (colMap[f.key] !== undefined) {
+          raw[f.key] = coerce(rows[i][colMap[f.key]], f.type);
+        }
+      }
+
+      // Check required fields
+      const missing = schema.fields.filter(f => f.required && !raw[f.key]);
+      if (missing.length) {
+        bad.push({ row: i + 2, reason: `Missing: ${missing.map(f => f.key).join(", ")}` });
+        continue;
+      }
+
+      try { good.push(schema.build(raw, ctx)); }
+      catch (err) { bad.push({ row: i + 2, reason: err.message }); }
+    }
+
+    setPreview(good);
+    setSkipped(bad);
+    setStep("preview");
+  };
+
+  // ── Step 3: Save to database ──────────────────────────────────────
+  const SETTERS = {
+    farmers: setFarmers, cherry: setCherry, cashbook: setCashbook,
+    expenses: setExpenses, debts: setDebts, machines: setMachines,
+    contractors: setContractors, projects: setProjects,
+  };
+
+  const doImport = () => {
+    if (!preview.length) return;
+    const setter = SETTERS[tableKey];
+    setter(prev => {
+      // Upsert: skip duplicates by id (shouldn't collide with uid() but belt-and-suspenders)
+      const existingIds = new Set((prev||[]).map(r => r.id));
+      const fresh = preview.filter(r => !existingIds.has(r.id));
+      return [...(prev||[]), ...fresh];
+    });
+    addNote(`✓ Imported ${preview.length} ${schema.label} record${preview.length !== 1 ? "s" : ""}${skipped.length ? ` (${skipped.length} skipped)` : ""}`, "success");
+    setStep("done");
+  };
+
+  // ── Styles ────────────────────────────────────────────────────────
+  const card = { background: C.gradCard, border: `1px solid ${C.border}`, borderRadius: 14, padding: "18px 20px", marginBottom: 16 };
+  const tag  = (ok) => ({ display: "inline-block", padding: "2px 8px", borderRadius: 12, fontSize: 10, fontWeight: 700,
+    background: ok ? `${C.success}20` : `${C.border}40`, color: ok ? C.success : C.textDim });
+
+  return <div style={{ maxWidth: 820 }}>
+    <div style={{ fontFamily: "'Inter',sans-serif", fontSize: 22, fontWeight: 700, color: C.text, letterSpacing: "-0.4px", marginBottom: 4 }}>📥 Import Data</div>
+    <div style={{ fontSize: 13, color: C.textMuted, marginBottom: 20 }}>Upload an Excel (.xlsx) or CSV file — the system matches columns automatically and only imports fields it recognises.</div>
+
+    {/* ── Step indicator ── */}
+    <div style={{ display: "flex", gap: 0, marginBottom: 24, borderRadius: 10, overflow: "hidden", border: `1px solid ${C.border}` }}>
+      {["Upload", "Map Columns", "Preview", "Done"].map((s, i) => {
+        const stepKeys = ["pick", "map", "preview", "done"];
+        const active = stepKeys.indexOf(step) === i;
+        const done   = stepKeys.indexOf(step) > i;
+        return <div key={s} style={{ flex: 1, padding: "9px 4px", textAlign: "center", fontSize: 11, fontWeight: 600,
+          background: active ? C.gold : done ? `${C.success}18` : C.bgDeep,
+          color: active ? "#000" : done ? C.success : C.textDim,
+          borderRight: i < 3 ? `1px solid ${C.border}` : "none" }}>{done ? "✓ " : ""}{s}</div>;
+      })}
+    </div>
+
+    {/* ════ STEP 1 — Upload ════ */}
+    {step === "pick" && <div style={card}>
+      {/* Table selector */}
+      <div style={{ marginBottom: 16 }}>
+        <div style={{ fontSize: 11, fontWeight: 700, color: C.textMuted, textTransform: "uppercase", letterSpacing: "0.8px", marginBottom: 8 }}>What are you importing?</div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))", gap: 8 }}>
+          {Object.entries(IMPORT_SCHEMAS).map(([k, s]) => <div key={k} onClick={() => setTableKey(k)} style={{
+            padding: "10px 12px", borderRadius: 10, cursor: "pointer", textAlign: "center",
+            border: `2px solid ${tableKey === k ? C.gold : C.border}`,
+            background: tableKey === k ? `${C.gold}15` : C.bgDeep,
+            transition: ".15s",
+          }}>
+            <div style={{ fontSize: 22, marginBottom: 4 }}>{s.icon}</div>
+            <div style={{ fontSize: 12, fontWeight: 600, color: tableKey === k ? C.gold : C.text }}>{s.label}</div>
+          </div>)}
+        </div>
+      </div>
+
+      {/* CWS selector (only for station-linked tables) */}
+      {["farmers","cherry","cashbook","expenses","debts"].includes(tableKey) && <div style={{ marginBottom: 16 }}>
+        <div style={{ fontSize: 11, fontWeight: 700, color: C.textMuted, textTransform: "uppercase", letterSpacing: "0.8px", marginBottom: 8 }}>Which washing station?</div>
+        <select value={cwsId} onChange={e => setCwsId(e.target.value)} style={{ width: "100%", padding: "10px 13px", background: C.bgDeep, border: `1.5px solid ${C.border}`, borderRadius: 10, color: C.text, fontSize: 13 }}>
+          <option value="">— Select station —</option>
+          {accessibleCws.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+        </select>
+      </div>}
+
+      {/* File picker */}
+      <div style={{ fontSize: 11, fontWeight: 700, color: C.textMuted, textTransform: "uppercase", letterSpacing: "0.8px", marginBottom: 8 }}>Upload file</div>
+      <label style={{ display: "block" }}>
+        <input type="file" accept=".xlsx,.xls,.csv" style={{ display: "none" }} id="import-file-input" onChange={handleFile}
+          disabled={["farmers","cherry","cashbook","expenses","debts"].includes(tableKey) && !cwsId} />
+        <div onClick={() => {
+          if (["farmers","cherry","cashbook","expenses","debts"].includes(tableKey) && !cwsId) {
+            addNote("Please select a washing station first", "warning"); return;
+          }
+          document.getElementById("import-file-input").click();
+        }} style={{ height: 120, border: `2px dashed ${C.border}`, borderRadius: 12, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 8, cursor: "pointer", color: C.textDim, transition: ".15s" }}
+          onMouseEnter={e => e.currentTarget.style.borderColor = C.gold}
+          onMouseLeave={e => e.currentTarget.style.borderColor = C.border}>
+          <span style={{ fontSize: 32 }}>📂</span>
+          <span style={{ fontSize: 13, fontWeight: 600 }}>{loading ? "Reading file…" : "Click to choose Excel or CSV file"}</span>
+          <span style={{ fontSize: 11 }}>.xlsx · .xls · .csv supported</span>
+        </div>
+      </label>
+
+      {/* Expected columns hint */}
+      <div style={{ marginTop: 16, padding: "12px 14px", background: C.bgDeep, borderRadius: 10 }}>
+        <div style={{ fontSize: 11, fontWeight: 700, color: C.textMuted, marginBottom: 6 }}>EXPECTED COLUMNS FOR {schema.label.toUpperCase()}</div>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+          {schema.fields.map(f => <span key={f.key} style={{ padding: "3px 10px", borderRadius: 20, fontSize: 11, fontWeight: 600,
+            background: f.required ? `${C.gold}20` : `${C.border}40`,
+            color: f.required ? C.gold : C.textDim,
+            border: `1px solid ${f.required ? C.gold+"40" : C.border}` }}>
+            {f.key}{f.required ? " *" : ""}
+          </span>)}
+        </div>
+        <div style={{ fontSize: 10, color: C.textDim, marginTop: 8 }}>* required &nbsp;|&nbsp; Column names don't need to match exactly — the system uses fuzzy matching</div>
+      </div>
+    </div>}
+
+    {/* ════ STEP 2 — Map Columns ════ */}
+    {step === "map" && <div>
+      <div style={card}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+          <div>
+            <div style={{ fontWeight: 700, fontSize: 14 }}>Column Mapping — {fileName}</div>
+            <div style={{ fontSize: 12, color: C.textMuted, marginTop: 2 }}>{rows.length} data rows detected · {headers.length} columns</div>
+          </div>
+          <button onClick={() => setStep("pick")} style={{ ...BtnS(C.border, true), fontSize: 11, padding: "5px 12px" }}>← Back</button>
+        </div>
+
+        <div style={{ display: "grid", gap: 10 }}>
+          {schema.fields.map(f => {
+            const matched = colMap[f.key] !== undefined;
+            return <div key={f.key} style={{ display: "grid", gridTemplateColumns: "1fr 24px 1fr", gap: 10, alignItems: "center" }}>
+              {/* System field */}
+              <div style={{ padding: "9px 12px", background: matched ? `${C.success}12` : `${C.border}20`, borderRadius: 8, border: `1px solid ${matched ? C.success+"40" : C.border}` }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: matched ? C.success : C.textDim }}>{f.key} {f.required ? "*" : ""}</div>
+                <div style={{ fontSize: 10, color: C.textDim }}>system field</div>
+              </div>
+              <div style={{ textAlign: "center", color: matched ? C.success : C.textDim, fontSize: 16 }}>{matched ? "→" : "✗"}</div>
+              {/* Excel column selector */}
+              <select value={colMap[f.key] !== undefined ? colMap[f.key] : ""}
+                onChange={e => {
+                  const v = e.target.value;
+                  setColMap(prev => v === "" ? (({ [f.key]: _, ...rest }) => rest)(prev) : { ...prev, [f.key]: +v });
+                }}
+                style={{ padding: "9px 12px", background: C.bgDeep, border: `1.5px solid ${matched ? C.success+"60" : C.border}`, borderRadius: 8, color: C.text, fontSize: 12 }}>
+                <option value="">— not mapped —</option>
+                {headers.map((h, i) => <option key={i} value={i}>{h} (col {i+1})</option>)}
+              </select>
+            </div>;
+          })}
+        </div>
+
+        {/* Sample data preview */}
+        {rows.length > 0 && <div style={{ marginTop: 16 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: C.textMuted, textTransform: "uppercase", marginBottom: 8 }}>First row of your data</div>
+          <div style={{ overflowX: "auto" }}>
+            <table style={{ width: "100%", fontSize: 11, borderCollapse: "collapse" }}>
+              <thead><tr>{headers.map((h,i) => <th key={i} style={{ padding: "5px 10px", background: C.bgDeep, color: C.textMuted, textAlign: "left", border: `1px solid ${C.border}`, whiteSpace: "nowrap" }}>{h}</th>)}</tr></thead>
+              <tbody><tr>{(rows[0]||[]).map((c,i) => <td key={i} style={{ padding: "5px 10px", color: C.text, border: `1px solid ${C.border}`, whiteSpace: "nowrap", maxWidth: 120, overflow: "hidden", textOverflow: "ellipsis" }}>{String(c)}</td>)}</tr></tbody>
+            </table>
+          </div>
+        </div>}
+
+        <button onClick={buildPreview} style={{ ...BtnS(C.gold), marginTop: 16, padding: "10px 24px", fontSize: 13 }}>Build Preview →</button>
+      </div>
+    </div>}
+
+    {/* ════ STEP 3 — Preview ════ */}
+    {step === "preview" && <div>
+      <div style={card}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+          <div>
+            <div style={{ fontWeight: 700, fontSize: 14 }}>Preview — Ready to Import</div>
+            <div style={{ fontSize: 12, color: C.textMuted, marginTop: 2 }}>
+              <span style={{ color: C.success, fontWeight: 700 }}>{preview.length} valid</span>
+              {skipped.length > 0 && <span style={{ color: C.warning, fontWeight: 700 }}> · {skipped.length} skipped</span>}
+            </div>
+          </div>
+          <button onClick={() => setStep("map")} style={{ ...BtnS(C.border, true), fontSize: 11, padding: "5px 12px" }}>← Back</button>
+        </div>
+
+        {/* Valid records table */}
+        {preview.length > 0 && <div style={{ overflowX: "auto", marginBottom: 14 }}>
+          <table style={{ width: "100%", fontSize: 11, borderCollapse: "collapse" }}>
+            <thead><tr>
+              {schema.fields.filter(f => colMap[f.key] !== undefined).map(f =>
+                <th key={f.key} style={{ padding: "7px 10px", background: C.bgDeep, color: C.textMuted, textAlign: "left", border: `1px solid ${C.border}`, whiteSpace: "nowrap" }}>{f.key}</th>
+              )}
+            </tr></thead>
+            <tbody>{preview.slice(0,20).map((r, i) => <tr key={i} className="tbl-row">
+              {schema.fields.filter(f => colMap[f.key] !== undefined).map(f =>
+                <td key={f.key} style={{ padding: "6px 10px", color: C.text, border: `1px solid ${C.border}`, whiteSpace: "nowrap" }}>{String(r[f.key] ?? "")}</td>
+              )}
+            </tr>)}</tbody>
+          </table>
+          {preview.length > 20 && <div style={{ textAlign: "center", color: C.textDim, fontSize: 11, padding: "8px 0" }}>…and {preview.length - 20} more rows</div>}
+        </div>}
+
+        {/* Skipped rows */}
+        {skipped.length > 0 && <div style={{ padding: "10px 14px", background: `${C.warning}10`, border: `1px solid ${C.warning}30`, borderRadius: 10, marginBottom: 14 }}>
+          <div style={{ fontWeight: 700, fontSize: 12, color: C.warning, marginBottom: 6 }}>⚠ Skipped Rows</div>
+          {skipped.map((s, i) => <div key={i} style={{ fontSize: 11, color: C.textDim }}>Row {s.row}: {s.reason}</div>)}
+        </div>}
+
+        <button onClick={doImport} disabled={!preview.length}
+          style={{ ...BtnS(C.success), padding: "11px 28px", fontSize: 13, opacity: preview.length ? 1 : 0.5 }}>
+          💾 Import {preview.length} Records
+        </button>
+      </div>
+    </div>}
+
+    {/* ════ STEP 4 — Done ════ */}
+    {step === "done" && <div style={{ ...card, textAlign: "center", padding: "40px 20px" }}>
+      <div style={{ fontSize: 48, marginBottom: 12 }}>✅</div>
+      <div style={{ fontWeight: 700, fontSize: 18, color: C.success, marginBottom: 8 }}>Import Complete</div>
+      <div style={{ fontSize: 13, color: C.textMuted, marginBottom: 24 }}>
+        {preview.length} {schema.label} records imported into the system and synced to Supabase.
+        {skipped.length > 0 && ` ${skipped.length} rows were skipped.`}
+      </div>
+      <div style={{ display: "flex", gap: 10, justifyContent: "center" }}>
+        <button onClick={() => { setStep("pick"); setRows([]); setHeaders([]); setColMap({}); setPreview([]); setSkipped([]); setFileName(""); }}
+          style={{ ...BtnS(C.gold), padding: "10px 20px", fontSize: 13 }}>Import Another File</button>
+      </div>
+    </div>}
+  </div>;
+}
+
 function GNRTable({ rows, cwsList, farmers: farmers2, full, showStation }) {
   if (!rows.length) return <ES text="No records" />;
   const cols = full ? ["Date", "GNR #", showStation && "Station", "Farmer", "Std kg", "Flt kg", "Total kg", "Rate Std", "Rate Flt", "Total Paid", "Avg Rate", "Method", "Status"] : ["Date", "GNR #", showStation && "Station", "Farmer", "Total kg", "Total Paid", "Method", "Status"];
