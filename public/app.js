@@ -422,9 +422,19 @@ function App() {
     const handleOffline = () => setOnline(false);
     window.addEventListener("online",  handleOnline);
     window.addEventListener("offline", handleOffline);
+    // Show a toast whenever a sync op is rejected by Supabase
+    const handleSyncError = (e) => {
+      // Throttle: don't spam if multiple ops fail at once
+      clearTimeout(window.__syncErrTimer);
+      window.__syncErrTimer = setTimeout(() => {
+        addNote("⚠ Sync error — check console for details: " + e.detail, "warning");
+      }, 300);
+    };
+    window.addEventListener("bender:sync-error", handleSyncError);
     return () => {
       window.removeEventListener("online",  handleOnline);
       window.removeEventListener("offline", handleOffline);
+      window.removeEventListener("bender:sync-error", handleSyncError);
     };
   }, []);
   const [notifications, setNotifications] = useState([
@@ -521,47 +531,67 @@ function App() {
   const syncToServer = async (table, records) => {
     try {
       const token = localStorage.getItem("bender_token");
-      if (!token) return; // not logged in — localStorage only
+      if (!token) return;
       const serverTable = TABLE_MAP[table] || table;
 
-      // ── system: uses its own PUT /api/system endpoint (key-value store) ──
+      // ── system: PUT /api/system ────────────────────────────────────────
       if (serverTable === "system") {
         const payload = Array.isArray(records) ? records[0] : records;
         const res = await apiFetch("/api/system", {
           method: "PUT",
           body: JSON.stringify(payload),
         });
-        if (!res.ok) throw new Error("system sync HTTP " + res.status);
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error("system sync " + res.status + ": " + (err.error || JSON.stringify(err)));
+        }
         return;
       }
 
-      // ── users: handled by dedicated /api/users endpoints ──────────────
+      // ── users: dedicated /api/users endpoints ─────────────────────────
       if (serverTable === "users") return;
 
-      // ── everything else: batch sync via /api/sync ──────────────────────
-      const ops = (Array.isArray(records) ? records : [records]).map(r => ({
-        table:  serverTable,
-        method: "POST", // upsert
-        id:     r.id,
-        data:   r,
-      }));
+      // ── everything else: /api/sync ─────────────────────────────────────
+      const ops = (Array.isArray(records) ? records : [records])
+        .filter(r => r && r.id) // skip records with no id — Supabase will reject them
+        .map(r => ({ table: serverTable, method: "POST", id: r.id, data: r }));
+
+      if (!ops.length) return;
+
       const res = await apiFetch("/api/sync", {
         method: "POST",
         body: JSON.stringify({ operations: ops }),
       });
-      if (!res.ok) throw new Error("sync HTTP " + res.status);
+
+      // ── Read body once, check both HTTP status and per-op results ─────
+      const body = await res.json().catch(() => ({ results: [] }));
+      if (!res.ok) {
+        throw new Error("sync HTTP " + res.status + ": " + (body.error || JSON.stringify(body)));
+      }
+
+      // Server returns ok:true even on partial failure — check each op result
+      const failed = (body.results || []).filter(r => !r.ok);
+      if (failed.length) {
+        // Log every failure so it's visible in DevTools → Console
+        failed.forEach(f =>
+          console.error(`[Bender] Supabase rejected ${serverTable}/${f.id}:`, f.error)
+        );
+        // Surface the first failure as a real error so it gets queued offline
+        throw new Error(`${failed.length} op(s) rejected by Supabase: ${failed[0].error}`);
+      }
     } catch (e) {
-      // Device is offline or server unreachable — queue for later
       console.warn("[Bender] Sync failed, queuing offline:", e.message);
+      // Surface the error in the UI so the user knows something went wrong
+      // Use a custom event so the notification system can pick it up
+      window.dispatchEvent(new CustomEvent("bender:sync-error", { detail: e.message }));
       const serverTable = TABLE_MAP[table] || table;
       if (serverTable === "system") {
-        // system is a single object — store it under a fixed key
         const payload = Array.isArray(records) ? records[0] : records;
         enqueueOp({ table: "system", method: "PUT", id: "__system__", data: payload });
       } else if (serverTable !== "users") {
-        (Array.isArray(records) ? records : [records]).forEach(r =>
-          enqueueOp({ table: serverTable, method: "POST", id: r.id, data: r })
-        );
+        (Array.isArray(records) ? records : [records])
+          .filter(r => r && r.id)
+          .forEach(r => enqueueOp({ table: serverTable, method: "POST", id: r.id, data: r }));
       }
     }
   };
@@ -571,7 +601,22 @@ function App() {
     raw((prev) => {
       const newVal = next(prev);
       DB.save(table, newVal); // always keep localStorage as offline cache
-      syncToServer(table, newVal); // also push to Supabase
+
+      // ── Smart sync: only push what actually changed ──────────────────
+      // Sending the entire array on every change is wasteful and causes
+      // Supabase to process hundreds of upserts unnecessarily.
+      // Instead, diff prev vs newVal and only sync added/changed records.
+      if (Array.isArray(newVal) && Array.isArray(prev)) {
+        const prevMap = new Map((prev || []).map(r => [r.id, JSON.stringify(r)]));
+        const changed = newVal.filter(r =>
+          r && r.id && prevMap.get(r.id) !== JSON.stringify(r)
+        );
+        if (changed.length) syncToServer(table, changed);
+      } else {
+        // Non-array (system config, single objects)
+        syncToServer(table, newVal);
+      }
+
       return newVal;
     });
   };
