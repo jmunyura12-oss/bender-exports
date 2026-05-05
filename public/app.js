@@ -609,6 +609,26 @@ function App() {
     }
   };
 
+  // Delete a single record from Supabase by id
+  const deleteFromServer = async (table, id) => {
+    try {
+      const token = localStorage.getItem("bender_token");
+      if (!token) return;
+      const serverTable = TABLE_MAP[table] || table;
+      const res = await apiFetch("/api/sync", {
+        method: "POST",
+        body: JSON.stringify({
+          operations: [{ table: serverTable, method: "DELETE", id, data: { id } }]
+        }),
+      });
+      if (!res.ok) throw new Error("delete sync HTTP " + res.status);
+    } catch (e) {
+      console.warn("[Bender] Delete failed, queuing offline:", e.message);
+      const serverTable = TABLE_MAP[table] || table;
+      enqueueOp({ table: serverTable, method: "DELETE", id, data: { id } });
+    }
+  };
+
   const mkSet = (raw, table) => (val) => {
     const next = typeof val === "function" ? val : () => val;
     raw((prev) => {
@@ -881,7 +901,7 @@ function App() {
 
     return null;
   };
-  const ctx = { users, setUsers, cwsList, setCwsList, syncToServer, farmers: farmers2, setFarmers, seasons, setSeasons, stationSeasons, setStationSeasons, cherry, setCherry, cashbook, setCashbook, bankTx, setBankTx, expenses, setExpenses, debts, setDebts, stock, setStock, fundRequests, setFundRequests, warehouseStock, setWarehouseStock, projects, setProjects, projectCosts, setProjectCosts, milestones, setMilestones, contractors, setContractors, machines, setMachines, assistants, setAssistants, tasks, setTasks, machTx, setMachTx, driverLogs, setDriverLogs, leaves, setLeaves, pending, setPending, system, setSystem, currentUser, online, setOnline, notifications, setNotifications, addNote, page, setPage, dbReady };
+  const ctx = { users, setUsers, cwsList, setCwsList, syncToServer, deleteFromServer, farmers: farmers2, setFarmers, seasons, setSeasons, stationSeasons, setStationSeasons, cherry, setCherry, cashbook, setCashbook, bankTx, setBankTx, expenses, setExpenses, debts, setDebts, stock, setStock, fundRequests, setFundRequests, warehouseStock, setWarehouseStock, projects, setProjects, projectCosts, setProjectCosts, milestones, setMilestones, contractors, setContractors, machines, setMachines, assistants, setAssistants, tasks, setTasks, machTx, setMachTx, driverLogs, setDriverLogs, leaves, setLeaves, pending, setPending, system, setSystem, currentUser, online, setOnline, notifications, setNotifications, addNote, page, setPage, dbReady };
   if (!dbReady) return <div style={{ minHeight: "100vh", background: C.bg, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 16 }}>
       <div style={{ fontFamily: "'Inter',sans-serif", fontSize: 26, letterSpacing: '-0.5px', fontWeight: 700, color: C.gold }}>Bender Exports</div>
       <div style={{ fontSize: 13, color: C.textMuted }}>{loadingStatus}</div>
@@ -1837,6 +1857,12 @@ function SeasonsPage({ onBack }) {
         {canManageSeason(u.role) && !activeSeason && <button onClick={() => setShowForm(true)} style={{ ...BtnS(C.success), marginLeft: "auto", padding: "8px 16px", fontSize: 12 }}>+ Open New Season</button>}
         {canManageSeason(u.role) && activeSeason && <button onClick={() => setShowEnrollForm(activeSeason.id)} style={{ ...BtnS(C.coffee, true), marginLeft: "auto", padding: "7px 13px", fontSize: 11 }}>+ Enroll Station</button>}
       </div>
+      {canManageSeason(u.role) && activeSeason && (
+        <div style={{ marginBottom: 14, padding: "10px 14px", background: `${C.warning}0A`, border: `1px solid ${C.warning}28`, borderRadius: 10, fontSize: 12, color: C.warning }}>
+          ⚠ A season is currently active — close it first before opening a new one.
+        </div>
+      )}
+      {seasons.length === 0 && <ES text="No seasons yet — click '+ Open New Season' to create the first one." />}
       {seasons.map((season) => {
     const seasonSS = stationSeasons.filter((ss) => ss.seasonId === season.id);
     const isActive = season.status === "active";
@@ -3789,7 +3815,7 @@ function UsersPage() {
     </div>;
 }
 function SystemPage() {
-  const { system, setSystem, cwsList, setCwsList, addNote, syncToServer } = useApp();
+  const { system, setSystem, cwsList, setCwsList, addNote, syncToServer, deleteFromServer } = useApp();
   const [tab, setTab] = useState("branding");
   const [labels, setLabels] = useState({ ...system.labels });
   const [newCWS, setNewCWS] = useState({ name: "", region: "", image: "" });
@@ -3912,7 +3938,7 @@ function SystemPage() {
                 </div>
                 <div style={{ padding: "10px 14px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                   <div><div style={{ fontWeight: 600, color: C.coffeeLight, fontSize: 13 }}>{cws.name}</div><div style={{ fontSize: 11, color: C.textMuted }}>{cws.region}</div></div>
-                  <button onClick={() => { setCwsList((p) => p.filter((c) => c.id !== cws.id)); addNote(`${cws.name} removed`, "warning"); }} style={{ ...BtnS(C.danger, false, true), fontSize: 10, padding: "3px 8px" }}>Remove</button>
+                  <button onClick={() => { deleteFromServer("cws", cws.id); setCwsList((p) => p.filter((c) => c.id !== cws.id)); addNote(`${cws.name} removed`, "warning"); }} style={{ ...BtnS(C.danger, false, true), fontSize: 10, padding: "3px 8px" }}>Remove</button>
                 </div>
               </div>)}
           </div>
@@ -3925,7 +3951,7 @@ function SystemPage() {
             </div>
             <button onClick={() => {
     if (!newCWS.name) return;
-    setCwsList((p) => [...p, { ...newCWS, id: newCWS.name.toLowerCase().replace(/\s+cws$/, "").replace(/\s+/g, "_") }]);
+    setCwsList((p) => [...p, { ...newCWS, id: uid() }]);
     setNewCWS({ name: "", region: "", image: "" });
     addNote(`${newCWS.name} added`, "success");
   }} style={{ ...BtnS(C.coffee), marginTop: 12, fontSize: 12, padding: "7px 14px" }}>+ Add Station</button>
