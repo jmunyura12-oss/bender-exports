@@ -352,6 +352,7 @@ const DB = {
 };
 function App() {
   const [dbReady, setDbReady] = useState(false);
+  const [loadingStatus, setLoadingStatus] = useState("Starting up…");
   const [users, setUsersRaw] = useState(INIT_USERS);
   const [cwsList, setCwsListRaw] = useState(INIT_CWS);
   const [farmers2, setFarmersRaw] = useState(INIT_FARMERS);
@@ -422,19 +423,9 @@ function App() {
     const handleOffline = () => setOnline(false);
     window.addEventListener("online",  handleOnline);
     window.addEventListener("offline", handleOffline);
-    // Show a toast whenever a sync op is rejected by Supabase
-    const handleSyncError = (e) => {
-      // Throttle: don't spam if multiple ops fail at once
-      clearTimeout(window.__syncErrTimer);
-      window.__syncErrTimer = setTimeout(() => {
-        addNote("⚠ Sync error — check console for details: " + e.detail, "warning");
-      }, 300);
-    };
-    window.addEventListener("bender:sync-error", handleSyncError);
     return () => {
       window.removeEventListener("online",  handleOnline);
       window.removeEventListener("offline", handleOffline);
-      window.removeEventListener("bender:sync-error", handleSyncError);
     };
   }, []);
   const [notifications, setNotifications] = useState([
@@ -496,31 +487,73 @@ function App() {
       if (!q.length) return;
       console.log(`[Bender] Flushing ${q.length} offline op(s) to server...`);
 
-      // Split: system ops use PUT /api/system, everything else uses /api/sync
       const systemOp = q.find(op => op.table === "system");
       const otherOps = q.filter(op => op.table !== "system");
 
-      let allOk = true;
+      // Track which op ids were successfully sent so we only remove those
+      const successfulIds = new Set();
 
+      // ── system op ────────────────────────────────────────────────────
       if (systemOp) {
-        const res = await apiFetch("/api/system", {
-          method: "PUT",
-          body: JSON.stringify(systemOp.data),
-        });
-        if (!res.ok) allOk = false;
+        try {
+          const res = await apiFetch("/api/system", {
+            method: "PUT",
+            body: JSON.stringify(systemOp.data),
+          });
+          if (res.ok) {
+            successfulIds.add("__system__");
+            console.log("[Bender] System config flushed.");
+          } else {
+            console.warn("[Bender] System flush failed HTTP", res.status);
+          }
+        } catch (e) {
+          console.warn("[Bender] System flush error:", e.message);
+        }
       }
 
+      // ── regular ops ──────────────────────────────────────────────────
       if (otherOps.length) {
-        const res = await apiFetch("/api/sync", {
-          method: "POST",
-          body: JSON.stringify({ operations: otherOps }),
-        });
-        if (!res.ok) allOk = false;
+        try {
+          const res = await apiFetch("/api/sync", {
+            method: "POST",
+            body: JSON.stringify({ operations: otherOps }),
+          });
+
+          // Read body ONCE — server always returns HTTP 200, must check per-op results
+          const body = await res.json().catch(() => ({ results: [] }));
+
+          if (!res.ok) {
+            console.warn("[Bender] Flush sync HTTP", res.status, body.error || "");
+          } else {
+            // Mark individual ops as successful or failed
+            (body.results || []).forEach(r => {
+              if (r.ok) {
+                successfulIds.add(r.id);
+              } else {
+                console.warn(`[Bender] Flush: Supabase rejected op ${r.id}:`, r.error);
+              }
+            });
+
+            // If server returned no results array, assume all sent ops succeeded
+            if (!body.results || body.results.length === 0) {
+              otherOps.forEach(op => successfulIds.add(op.id));
+            }
+          }
+        } catch (e) {
+          console.warn("[Bender] Flush sync error:", e.message);
+        }
       }
 
-      if (allOk) {
-        localStorage.removeItem(OFFLINE_QUEUE_KEY);
-        console.log("[Bender] Offline queue flushed successfully.");
+      // ── Remove only the ops that actually succeeded ───────────────────
+      // Failed ops stay in the queue and will be retried next time
+      const remaining = q.filter(op => !successfulIds.has(op.id));
+      if (remaining.length < q.length) {
+        if (remaining.length === 0) {
+          localStorage.removeItem(OFFLINE_QUEUE_KEY);
+        } else {
+          localStorage.setItem(OFFLINE_QUEUE_KEY, JSON.stringify(remaining));
+        }
+        console.log(`[Bender] Flushed ${q.length - remaining.length}/${q.length} ops. ${remaining.length} still queued.`);
       }
     } catch (e) {
       console.warn("[Bender] Queue flush failed (still offline?):", e.message);
@@ -531,67 +564,47 @@ function App() {
   const syncToServer = async (table, records) => {
     try {
       const token = localStorage.getItem("bender_token");
-      if (!token) return;
+      if (!token) return; // not logged in — localStorage only
       const serverTable = TABLE_MAP[table] || table;
 
-      // ── system: PUT /api/system ────────────────────────────────────────
+      // ── system: uses its own PUT /api/system endpoint (key-value store) ──
       if (serverTable === "system") {
         const payload = Array.isArray(records) ? records[0] : records;
         const res = await apiFetch("/api/system", {
           method: "PUT",
           body: JSON.stringify(payload),
         });
-        if (!res.ok) {
-          const err = await res.json().catch(() => ({}));
-          throw new Error("system sync " + res.status + ": " + (err.error || JSON.stringify(err)));
-        }
+        if (!res.ok) throw new Error("system sync HTTP " + res.status);
         return;
       }
 
-      // ── users: dedicated /api/users endpoints ─────────────────────────
+      // ── users: handled by dedicated /api/users endpoints ──────────────
       if (serverTable === "users") return;
 
-      // ── everything else: /api/sync ─────────────────────────────────────
-      const ops = (Array.isArray(records) ? records : [records])
-        .filter(r => r && r.id) // skip records with no id — Supabase will reject them
-        .map(r => ({ table: serverTable, method: "POST", id: r.id, data: r }));
-
-      if (!ops.length) return;
-
+      // ── everything else: batch sync via /api/sync ──────────────────────
+      const ops = (Array.isArray(records) ? records : [records]).map(r => ({
+        table:  serverTable,
+        method: "POST", // upsert
+        id:     r.id,
+        data:   r,
+      }));
       const res = await apiFetch("/api/sync", {
         method: "POST",
         body: JSON.stringify({ operations: ops }),
       });
-
-      // ── Read body once, check both HTTP status and per-op results ─────
-      const body = await res.json().catch(() => ({ results: [] }));
-      if (!res.ok) {
-        throw new Error("sync HTTP " + res.status + ": " + (body.error || JSON.stringify(body)));
-      }
-
-      // Server returns ok:true even on partial failure — check each op result
-      const failed = (body.results || []).filter(r => !r.ok);
-      if (failed.length) {
-        // Log every failure so it's visible in DevTools → Console
-        failed.forEach(f =>
-          console.error(`[Bender] Supabase rejected ${serverTable}/${f.id}:`, f.error)
-        );
-        // Surface the first failure as a real error so it gets queued offline
-        throw new Error(`${failed.length} op(s) rejected by Supabase: ${failed[0].error}`);
-      }
+      if (!res.ok) throw new Error("sync HTTP " + res.status);
     } catch (e) {
+      // Device is offline or server unreachable — queue for later
       console.warn("[Bender] Sync failed, queuing offline:", e.message);
-      // Surface the error in the UI so the user knows something went wrong
-      // Use a custom event so the notification system can pick it up
-      window.dispatchEvent(new CustomEvent("bender:sync-error", { detail: e.message }));
       const serverTable = TABLE_MAP[table] || table;
       if (serverTable === "system") {
+        // system is a single object — store it under a fixed key
         const payload = Array.isArray(records) ? records[0] : records;
         enqueueOp({ table: "system", method: "PUT", id: "__system__", data: payload });
       } else if (serverTable !== "users") {
-        (Array.isArray(records) ? records : [records])
-          .filter(r => r && r.id)
-          .forEach(r => enqueueOp({ table: serverTable, method: "POST", id: r.id, data: r }));
+        (Array.isArray(records) ? records : [records]).forEach(r =>
+          enqueueOp({ table: serverTable, method: "POST", id: r.id, data: r })
+        );
       }
     }
   };
@@ -601,22 +614,7 @@ function App() {
     raw((prev) => {
       const newVal = next(prev);
       DB.save(table, newVal); // always keep localStorage as offline cache
-
-      // ── Smart sync: only push what actually changed ──────────────────
-      // Sending the entire array on every change is wasteful and causes
-      // Supabase to process hundreds of upserts unnecessarily.
-      // Instead, diff prev vs newVal and only sync added/changed records.
-      if (Array.isArray(newVal) && Array.isArray(prev)) {
-        const prevMap = new Map((prev || []).map(r => [r.id, JSON.stringify(r)]));
-        const changed = newVal.filter(r =>
-          r && r.id && prevMap.get(r.id) !== JSON.stringify(r)
-        );
-        if (changed.length) syncToServer(table, changed);
-      } else {
-        // Non-array (system config, single objects)
-        syncToServer(table, newVal);
-      }
-
+      syncToServer(table, newVal); // also push to Supabase
       return newVal;
     });
   };
@@ -695,7 +693,8 @@ function App() {
       } catch (e) {
         console.error("DB init error", e);
       }
-      setDbReady(true);
+      // NOTE: setDbReady(true) is called AFTER the server pull below,
+      // so the app never renders with stale/empty data.
 
       // ── Boot sync sequence ───────────────────────────────────────────
       // 1. Flush any ops saved while offline (they must reach the server first)
@@ -704,7 +703,9 @@ function App() {
       try {
         const token = localStorage.getItem("bender_token");
         if (token) {
+          setLoadingStatus("Syncing offline changes…");
           await flushOfflineQueue(); // step 1: push offline changes up first
+          setLoadingStatus("Pulling latest data from server…");
           localStorage.removeItem("last_sync"); // step 2: force full pull
           const lastSync = "1970-01-01T00:00:00Z";
           const res = await apiFetch(`/api/pull?since=${encodeURIComponent(lastSync)}`);
@@ -782,7 +783,13 @@ function App() {
             }
           } catch (_) {}
         }
-      } catch (_) { /* server unreachable — use local data */ }
+      } catch (e) {
+        // Server unreachable — use whatever is in localStorage
+        console.warn("[Bender] Server pull failed on boot:", e.message);
+      } finally {
+        // Always mark ready — even if pull failed, show cached local data
+        setDbReady(true);
+      }
     }
     init();
   }, []);
@@ -877,7 +884,7 @@ function App() {
   const ctx = { users, setUsers, cwsList, setCwsList, syncToServer, farmers: farmers2, setFarmers, seasons, setSeasons, stationSeasons, setStationSeasons, cherry, setCherry, cashbook, setCashbook, bankTx, setBankTx, expenses, setExpenses, debts, setDebts, stock, setStock, fundRequests, setFundRequests, warehouseStock, setWarehouseStock, projects, setProjects, projectCosts, setProjectCosts, milestones, setMilestones, contractors, setContractors, machines, setMachines, assistants, setAssistants, tasks, setTasks, machTx, setMachTx, driverLogs, setDriverLogs, leaves, setLeaves, pending, setPending, system, setSystem, currentUser, online, setOnline, notifications, setNotifications, addNote, page, setPage, dbReady };
   if (!dbReady) return <div style={{ minHeight: "100vh", background: C.bg, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 16 }}>
       <div style={{ fontFamily: "'Inter',sans-serif", fontSize: 26, letterSpacing: '-0.5px', fontWeight: 700, color: C.gold }}>Bender Exports</div>
-      <div style={{ fontSize: 13, color: C.textMuted }}>Loading database...</div>
+      <div style={{ fontSize: 13, color: C.textMuted }}>{loadingStatus}</div>
       <div style={{ width: 180, height: 3, background: C.border, borderRadius: 4, overflow: "hidden" }}>
         <div style={{ height: "100%", background: C.gold, borderRadius: 4, animation: "pulse 1.2s ease infinite" }} />
       </div>
