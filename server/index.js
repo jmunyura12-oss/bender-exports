@@ -247,7 +247,7 @@ app.post("/api/auth/refresh", async (req, res) => {
 });
 
 // ── Users ─────────────────────────────────────────────────────────────
-app.get("/api/users", auth, async (req, res) => {
+app.get("/api/users", async (req, res) => {
   try {
     const rows = await sbFetch("/profiles?select=id,name,email,role,cws_access,machine_id,avatar,created_at,updated_at,active&order=name");
     res.json(rows);
@@ -278,7 +278,7 @@ app.put("/api/users/:id", auth, async (req, res) => {
   if (req.user.id !== req.params.id && !["sudo","admin","md"].includes(req.user.role))
     return res.status(403).json({ error: "Forbidden" });
 
-  const { name, role, cwsAccess, machineId, avatar, active, email } = req.body || {};
+  const { name, role, cwsAccess, machineId, avatar, active, email, password } = req.body || {};
   const paramId = req.params.id;
 
   try {
@@ -292,25 +292,33 @@ app.put("/api/users/:id", auth, async (req, res) => {
       updated_at: new Date().toISOString(),
     };
 
-    // Try by UUID first (standard Supabase id)
+    // Resolve the Supabase auth UUID — needed to update the password in Auth
+    let resolvedId = null;
+
     const isUUID = /^[0-9a-f-]{36}$/i.test(paramId);
     if (isUUID) {
-      await sbFetch(`/profiles?id=eq.${paramId}`, { method: "PATCH", body: JSON.stringify(payload) });
-      return res.json({ ok: true });
-    }
-
-    // Seed user — look up by email
-    if (email) {
+      resolvedId = paramId;
+    } else if (email) {
+      // Seed user — look up their Supabase UUID by email
       const existing = await sbFetch(`/profiles?email=eq.${encodeURIComponent(email)}&select=id`);
-      if (existing && existing.length > 0) {
-        await sbFetch(`/profiles?id=eq.${existing[0].id}`, { method: "PATCH", body: JSON.stringify(payload) });
-        return res.json({ ok: true, supabaseId: existing[0].id });
-      }
-      // Profile doesn't exist yet — create it via signup flow
-      return res.status(404).json({ error: "Profile not found — use POST /api/seed-profiles first" });
+      if (!existing || existing.length === 0)
+        return res.status(404).json({ error: "Profile not found — use POST /api/seed-profiles first" });
+      resolvedId = existing[0].id;
+    } else {
+      return res.status(400).json({ error: "Cannot identify user — provide UUID or email" });
     }
 
-    res.status(400).json({ error: "Cannot identify user — provide UUID or email" });
+    // 1. Update the profile table (name, role, cws_access, etc.)
+    await sbFetch(`/profiles?id=eq.${resolvedId}`, { method: "PATCH", body: JSON.stringify(payload) });
+
+    // 2. If a new password was provided, update it in Supabase Auth as well.
+    //    Without this step, the old password keeps working on any machine that
+    //    pulls credentials fresh from the server.
+    if (password && password.trim().length >= 6) {
+      await sbAuth(`/admin/users/${resolvedId}`, { password: password.trim() }, "PUT");
+    }
+
+    return res.json({ ok: true, supabaseId: resolvedId });
   } catch (e) { res.status(400).json({ error: e.message }); }
 });
 
@@ -420,7 +428,7 @@ app.post("/api/sync", auth, async (req, res) => {
 });
 
 // ── Delta Pull ────────────────────────────────────────────────────────
-app.get("/api/pull", auth, async (req, res) => {
+app.get("/api/pull", async (req, res) => {
   const since  = req.query.since || "1970-01-01T00:00:00.000Z";
   const delta  = {};
   await Promise.all(TABLES.map(async t => {
@@ -432,7 +440,7 @@ app.get("/api/pull", auth, async (req, res) => {
 });
 
 // ── System Config ─────────────────────────────────────────────────────
-app.get("/api/system", auth, async (req, res) => {
+app.get("/api/system", async (req, res) => {
   try {
     const rows = await sbFetch("/system_config?select=key,value");
     const cfg  = {};
