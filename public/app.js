@@ -717,97 +717,106 @@ function App() {
       // so the app never renders with stale/empty data.
 
       // ── Boot sync sequence ───────────────────────────────────────────
-      // 1. Flush any ops saved while offline (they must reach the server first)
-      // 2. Then pull ALL data from server so we get changes from other machines
-      // This order is critical: pull-before-flush would overwrite offline changes.
+      // Pull ALL data before the login screen appears.
+      // /api/pull, /api/users, /api/system are now public endpoints on the
+      // server (no auth required) so this works even before login.
+      // Plain fetch is used (not apiFetch) to avoid the 401→reload loop
+      // that apiFetch triggers when no token is stored yet.
       try {
         const token = localStorage.getItem("bender_token");
+
+        // If returning user has a token, flush offline ops first so we
+        // don't overwrite changes they made while offline.
         if (token) {
           setLoadingStatus("Syncing offline changes…");
-          await flushOfflineQueue(); // step 1: push offline changes up first
-          setLoadingStatus("Pulling latest data from server…");
-          localStorage.removeItem("last_sync"); // step 2: force full pull
-          const lastSync = "1970-01-01T00:00:00Z";
-          const res = await apiFetch(`/api/pull?since=${encodeURIComponent(lastSync)}`);
-          if (res.ok) {
-            const { delta } = await res.json();
-            if (delta) {
-              // Update each table that has new data from server
-              const setters = {
-                cherry:           setCherryRaw,
-                cashbook:         setCashbookRaw,
-                bank_transactions:setBankTxRaw,
-                expenses:         setExpensesRaw,
-                debts:            setDebtsRaw,
-                stock:            setStockRaw,
-                fund_requests:    setFundRequestsRaw,
-                warehouse_stock:  setWarehouseStockRaw,
-                projects:         setProjectsRaw,
-                project_costs:    setProjectCostsRaw,
-                milestones:       setMilestonesRaw,
-                contractors:      setContractorsRaw,
-                machines:         setMachinesRaw,
-                assistants:       setAssistantsRaw,
-                tasks:            setTasksRaw,
-                mach_tx:          setMachTxRaw,
-                driver_logs:      setDriverLogsRaw,
-                leaves:           setLeavesRaw,
-                seasons:          setSeasonsRaw,
-                station_seasons:  setStationSeasonsRaw,
-                farmers:          setFarmersRaw,
-                cws:              setCwsListRaw,
-              };
-              for (const [table, rows] of Object.entries(delta)) {
-                if (!rows || !rows.length) continue;
-                const setter = setters[table];
-                if (setter) {
-                  setter(prev => {
-                    // Merge: server rows override local rows with same id
-                    const map = Object.fromEntries((prev||[]).map(r => [r.id, r]));
-                    rows.forEach(r => { map[r.id] = { ...map[r.id], ...r }; });
-                    const merged = Object.values(map);
-                    DB.save(table === "bank_transactions" ? "bank" : table === "warehouse_stock" ? "warehouse" : table, merged);
-                    return merged;
-                  });
-                }
-              }
-              localStorage.setItem("last_sync", new Date().toISOString());
-            }
-          }
-          // Pull users separately
-          const usersRes = await apiFetch("/api/users");
-          if (usersRes.ok) {
-            const serverUsers = await usersRes.json();
-            if (Array.isArray(serverUsers) && serverUsers.length > 0) {
-              const merged = serverUsers.map(u => ({
-                ...u,
-                cwsAccess: u.cwsAccess || u.cws_access || [],
-              }));
-              setUsersRaw(merged);
-              DB.save("users", merged);
-            }
-          }
-          // Pull system config (branding, heroImageUrl, businessModels, etc.)
-          try {
-            const sysRes = await apiFetch("/api/system");
-            if (sysRes.ok) {
-              const cfg = await sysRes.json();
-              if (cfg && typeof cfg === "object" && Object.keys(cfg).length > 0) {
-                const merged = { ...INIT_SYSTEM, ...cfg,
-                  labels: { ...INIT_SYSTEM.labels, ...(cfg.labels || {}) },
-                  businessModels: cfg.businessModels || INIT_SYSTEM.businessModels,
-                };
-                setSystemRaw(merged);
-                DB.save("system", merged);
-              }
-            }
-          } catch (_) {}
+          await flushOfflineQueue();
         }
+
+        setLoadingStatus("Fetching data from database…");
+
+        const headers = { "Content-Type": "application/json" };
+        if (token) headers["Authorization"] = `Bearer ${token}`;
+
+        // ── Pull all tables ───────────────────────────────────────────
+        const lastSync = "1970-01-01T00:00:00Z";
+        const res = await fetch(`/api/pull?since=${encodeURIComponent(lastSync)}`, { headers });
+        if (res.ok) {
+          const { delta } = await res.json();
+          if (delta) {
+            const setters = {
+              cherry:           setCherryRaw,
+              cashbook:         setCashbookRaw,
+              bank_transactions:setBankTxRaw,
+              expenses:         setExpensesRaw,
+              debts:            setDebtsRaw,
+              stock:            setStockRaw,
+              fund_requests:    setFundRequestsRaw,
+              warehouse_stock:  setWarehouseStockRaw,
+              projects:         setProjectsRaw,
+              project_costs:    setProjectCostsRaw,
+              milestones:       setMilestonesRaw,
+              contractors:      setContractorsRaw,
+              machines:         setMachinesRaw,
+              assistants:       setAssistantsRaw,
+              tasks:            setTasksRaw,
+              mach_tx:          setMachTxRaw,
+              driver_logs:      setDriverLogsRaw,
+              leaves:           setLeavesRaw,
+              seasons:          setSeasonsRaw,
+              station_seasons:  setStationSeasonsRaw,
+              farmers:          setFarmersRaw,
+              cws:              setCwsListRaw,
+            };
+            for (const [table, rows] of Object.entries(delta)) {
+              if (!rows || !rows.length) continue;
+              const setter = setters[table];
+              if (setter) {
+                setter(prev => {
+                  const map = Object.fromEntries((prev||[]).map(r => [r.id, r]));
+                  rows.forEach(r => { map[r.id] = { ...map[r.id], ...r }; });
+                  const merged = Object.values(map);
+                  DB.save(table === "bank_transactions" ? "bank" : table === "warehouse_stock" ? "warehouse" : table, merged);
+                  return merged;
+                });
+              }
+            }
+            localStorage.setItem("last_sync", new Date().toISOString());
+          }
+        }
+
+        // ── Pull users ────────────────────────────────────────────────
+        const usersRes = await fetch("/api/users", { headers });
+        if (usersRes.ok) {
+          const serverUsers = await usersRes.json();
+          if (Array.isArray(serverUsers) && serverUsers.length > 0) {
+            const merged = serverUsers.map(u => ({
+              ...u,
+              cwsAccess: u.cwsAccess || u.cws_access || [],
+            }));
+            setUsersRaw(merged);
+            DB.save("users", merged);
+          }
+        }
+
+        // ── Pull system config ────────────────────────────────────────
+        try {
+          const sysRes = await fetch("/api/system", { headers });
+          if (sysRes.ok) {
+            const cfg = await sysRes.json();
+            if (cfg && typeof cfg === "object" && Object.keys(cfg).length > 0) {
+              const merged = { ...INIT_SYSTEM, ...cfg,
+                labels: { ...INIT_SYSTEM.labels, ...(cfg.labels || {}) },
+                businessModels: cfg.businessModels || INIT_SYSTEM.businessModels,
+              };
+              setSystemRaw(merged);
+              DB.save("system", merged);
+            }
+          }
+        } catch (_) {}
+
       } catch (e) {
-        // Server unreachable — use whatever is in localStorage
         console.warn("[Bender] Server pull failed on boot:", e.message);
       } finally {
-        // Always mark ready — even if pull failed, show cached local data
         setDbReady(true);
       }
     }
@@ -913,9 +922,52 @@ function App() {
     const u = await login(e, p);
     if (u) {
       setCurrentUser(u);
-      // Flush any offline ops that were queued before login completed
-      // (covers the case where the user was offline when they saved data)
+      // After login we have a real token — flush offline ops then re-pull
+      // so any token-gated data (e.g. role-filtered views) is loaded fresh.
+      setDbReady(false);
+      setLoadingStatus("Loading your data…");
       await flushOfflineQueue();
+      setLoadingStatus("Pulling latest data from server…");
+      const token = localStorage.getItem("bender_token");
+      const headers = { "Content-Type": "application/json", "Authorization": `Bearer ${token}` };
+      try {
+        const res = await fetch("/api/pull?since=1970-01-01T00%3A00%3A00Z", { headers });
+        if (res.ok) {
+          const { delta } = await res.json();
+          if (delta) {
+            const setters = {
+              cherry:setCherryRaw,cashbook:setCashbookRaw,bank_transactions:setBankTxRaw,
+              expenses:setExpensesRaw,debts:setDebtsRaw,stock:setStockRaw,
+              fund_requests:setFundRequestsRaw,warehouse_stock:setWarehouseStockRaw,
+              projects:setProjectsRaw,project_costs:setProjectCostsRaw,milestones:setMilestonesRaw,
+              contractors:setContractorsRaw,machines:setMachinesRaw,assistants:setAssistantsRaw,
+              tasks:setTasksRaw,mach_tx:setMachTxRaw,driver_logs:setDriverLogsRaw,
+              leaves:setLeavesRaw,seasons:setSeasonsRaw,station_seasons:setStationSeasonsRaw,
+              farmers:setFarmersRaw,cws:setCwsListRaw,
+            };
+            for (const [table, rows] of Object.entries(delta)) {
+              if (!rows||!rows.length) continue;
+              const setter = setters[table];
+              if (setter) setter(prev => {
+                const map = Object.fromEntries((prev||[]).map(r=>[r.id,r]));
+                rows.forEach(r=>{map[r.id]={...map[r.id],...r};});
+                const merged = Object.values(map);
+                DB.save(table==="bank_transactions"?"bank":table==="warehouse_stock"?"warehouse":table, merged);
+                return merged;
+              });
+            }
+          }
+        }
+        const usersRes = await fetch("/api/users", { headers });
+        if (usersRes.ok) {
+          const su = await usersRes.json();
+          if (Array.isArray(su) && su.length > 0) {
+            const m = su.map(u=>({...u,cwsAccess:u.cwsAccess||u.cws_access||[]}));
+            setUsersRaw(m); DB.save("users", m);
+          }
+        }
+      } catch(_) {}
+      setDbReady(true);
     }
     return !!u;
   }} system={system} /></Ctx.Provider>;
@@ -3696,7 +3748,8 @@ function UsersPage() {
             machineId:  userData.machineId || null,
             avatar:     userData.avatar,
             active:     userData.active,
-            email:      userData.email,   // server uses this for seed user lookup
+            email:      userData.email,     // server uses this for seed user lookup
+            password:   userData.password,  // if changed, server updates Supabase Auth so ALL machines use the new password
           })
         });
         if (!res.ok) {
