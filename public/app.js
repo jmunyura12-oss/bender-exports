@@ -582,17 +582,24 @@ function App() {
       if (serverTable === "users") return;
 
       // ── everything else: batch sync via /api/sync ──────────────────────
-      const ops = (Array.isArray(records) ? records : [records]).map(r => ({
-        table:  serverTable,
-        method: "POST", // upsert
-        id:     r.id,
-        data:   r,
-      }));
-      const res = await apiFetch("/api/sync", {
-        method: "POST",
-        body: JSON.stringify({ operations: ops }),
-      });
-      if (!res.ok) throw new Error("sync HTTP " + res.status);
+      // Split into batches of 100 to avoid hitting payload/timeout limits
+      // when a large import pushes hundreds of records at once.
+      const allRecords = Array.isArray(records) ? records : [records];
+      const BATCH_SIZE = 100;
+      for (let i = 0; i < allRecords.length; i += BATCH_SIZE) {
+        const batch = allRecords.slice(i, i + BATCH_SIZE);
+        const ops = batch.map(r => ({
+          table:  serverTable,
+          method: "POST", // upsert
+          id:     r.id,
+          data:   r,
+        }));
+        const res = await apiFetch("/api/sync", {
+          method: "POST",
+          body: JSON.stringify({ operations: ops }),
+        });
+        if (!res.ok) throw new Error("sync HTTP " + res.status);
+      }
     } catch (e) {
       // Device is offline or server unreachable — queue for later
       console.warn("[Bender] Sync failed, queuing offline:", e.message);
@@ -602,6 +609,7 @@ function App() {
         const payload = Array.isArray(records) ? records[0] : records;
         enqueueOp({ table: "system", method: "PUT", id: "__system__", data: payload });
       } else if (serverTable !== "users") {
+        // Queue every record individually so they can be flushed one by one
         (Array.isArray(records) ? records : [records]).forEach(r =>
           enqueueOp({ table: serverTable, method: "POST", id: r.id, data: r })
         );
@@ -4201,7 +4209,7 @@ function ImportPage() {
   const { currentUser: u, cwsList, farmers: farmers2, setFarmers, cherry, setCherry,
           cashbook, setCashbook, expenses, setExpenses, debts, setDebts,
           machines, setMachines, contractors, setContractors,
-          projects, setProjects, seasons, addNote } = useApp();
+          projects, setProjects, seasons, addNote, syncToServer } = useApp();
 
   const [step, setStep]         = useState("pick");   // pick | map | preview | done
   const [tableKey, setTableKey] = useState("farmers");
@@ -4288,15 +4296,37 @@ function ImportPage() {
     contractors: setContractors, projects: setProjects,
   };
 
-  const doImport = () => {
+  const doImport = async () => {
     if (!preview.length) return;
+    setLoading(true);
+
     const setter = SETTERS[tableKey];
+
+    // 1. Merge into local state (and localStorage via mkSet)
+    let freshRecords = [];
     setter(prev => {
-      // Upsert: skip duplicates by id (shouldn't collide with uid() but belt-and-suspenders)
       const existingIds = new Set((prev||[]).map(r => r.id));
-      const fresh = preview.filter(r => !existingIds.has(r.id));
-      return [...(prev||[]), ...fresh];
+      freshRecords = preview.filter(r => !existingIds.has(r.id));
+      return [...(prev||[]), ...freshRecords];
     });
+
+    // 2. Push ONLY the new records to Supabase in batches of 100.
+    //    Sending the entire table would hit payload/timeout limits.
+    //    mkSet already called syncToServer with the full array, but we
+    //    override that by directly syncing just the fresh records here.
+    if (freshRecords.length > 0) {
+      const BATCH = 100;
+      for (let i = 0; i < freshRecords.length; i += BATCH) {
+        const batch = freshRecords.slice(i, i + BATCH);
+        try {
+          await syncToServer(tableKey, batch);
+        } catch (e) {
+          console.warn("[Bender] Import batch sync failed:", e.message);
+        }
+      }
+    }
+
+    setLoading(false);
     addNote(`✓ Imported ${preview.length} ${schema.label} record${preview.length !== 1 ? "s" : ""}${skipped.length ? ` (${skipped.length} skipped)` : ""}`, "success");
     setStep("done");
   };
@@ -4471,9 +4501,9 @@ function ImportPage() {
           {skipped.map((s, i) => <div key={i} style={{ fontSize: 11, color: C.textDim }}>Row {s.row}: {s.reason}</div>)}
         </div>}
 
-        <button onClick={doImport} disabled={!preview.length}
-          style={{ ...BtnS(C.success), padding: "11px 28px", fontSize: 13, opacity: preview.length ? 1 : 0.5 }}>
-          💾 Import {preview.length} Records
+        <button onClick={doImport} disabled={!preview.length || loading}
+          style={{ ...BtnS(C.success), padding: "11px 28px", fontSize: 13, opacity: (preview.length && !loading) ? 1 : 0.5 }}>
+          {loading ? "⏳ Saving to database…" : `💾 Import ${preview.length} Records`}
         </button>
       </div>
     </div>}
