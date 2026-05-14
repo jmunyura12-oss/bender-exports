@@ -4305,39 +4305,27 @@ function ImportPage() {
     contractors: setContractors, projects: setProjects,
   };
 
-  // Raw setters (bypass mkSet so we don't sync the entire table on import)
-  const RAW_SETTERS = {
-    farmers: setFarmersRaw, cherry: setCherryRaw, cashbook: setCashbookRaw,
-    expenses: setExpensesRaw, debts: setDebtsRaw, machines: setMachinesRaw,
-    contractors: setContractorsRaw, projects: setProjectsRaw,
-  };
-
   const doImport = async () => {
     if (!preview.length) return;
     setLoading(true);
 
-    // 1. Compute fresh records synchronously (before any state update)
-    //    so we know exactly what to send to the server.
-    const rawSetter = RAW_SETTERS[tableKey];
-    // Access current state via the SETTERS map (mkSet wraps the raw array)
-    // We need the current IDs — read them from the preview context instead
-    // by using a ref trick: capture inside a temporary state read.
-    // Simplest correct approach: filter by id collision in preview itself
-    // (uid() makes collisions essentially impossible, so all preview records are fresh).
-    const freshRecords = preview; // all imported rows are new (uid() ids)
+    // All imported records have fresh uid() ids — no collision possible.
+    // Use the normal mkSet setter (delta-aware since last fix) — it will
+    // sync only the new records, not the entire table.
+    const setter = SETTERS[tableKey];
 
-    // 2. Merge into local state + localStorage WITHOUT going through mkSet.
-    //    mkSet would sync the entire table array which can be huge.
-    rawSetter(prev => {
+    // Collect the new records for explicit batched sync to Supabase.
+    // We sync explicitly in batches of 100 rather than relying on mkSet
+    // so we can track success/failure and show the right message.
+    const freshRecords = preview;
+
+    // 1. Merge into local state + localStorage (via mkSet → DB.save)
+    setter(prev => {
       const existingIds = new Set((prev||[]).map(r => r.id));
-      const deduped = freshRecords.filter(r => !existingIds.has(r.id));
-      const merged = [...(prev||[]), ...deduped];
-      DB.save(tableKey, merged); // persist to localStorage
-      return merged;
+      return [...(prev||[]), ...freshRecords.filter(r => !existingIds.has(r.id))];
     });
 
-    // 3. Push ONLY the new records to Supabase in batches of 100.
-    //    syncToServer sends them via /api/sync which applies toSnake() server-side.
+    // 2. Push to Supabase in batches of 100
     let syncOk = true;
     const BATCH = 100;
     for (let i = 0; i < freshRecords.length; i += BATCH) {
