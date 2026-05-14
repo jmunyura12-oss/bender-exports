@@ -642,7 +642,16 @@ function App() {
     raw((prev) => {
       const newVal = next(prev);
       DB.save(table, newVal); // always keep localStorage as offline cache
-      syncToServer(table, newVal); // also push to Supabase
+
+      // Only sync records that are NEW or CHANGED — never the entire array.
+      // This prevents sending thousands of records to Supabase every time
+      // a single record is added or updated.
+      const prevMap = Object.fromEntries((prev || []).map(r => [r.id, JSON.stringify(r)]));
+      const changed = (Array.isArray(newVal) ? newVal : [newVal]).filter(r =>
+        r && r.id && prevMap[r.id] !== JSON.stringify(r) // new or modified
+      );
+      if (changed.length > 0) syncToServer(table, changed);
+
       return newVal;
     });
   };
@@ -4296,38 +4305,57 @@ function ImportPage() {
     contractors: setContractors, projects: setProjects,
   };
 
+  // Raw setters (bypass mkSet so we don't sync the entire table on import)
+  const RAW_SETTERS = {
+    farmers: setFarmersRaw, cherry: setCherryRaw, cashbook: setCashbookRaw,
+    expenses: setExpensesRaw, debts: setDebtsRaw, machines: setMachinesRaw,
+    contractors: setContractorsRaw, projects: setProjectsRaw,
+  };
+
   const doImport = async () => {
     if (!preview.length) return;
     setLoading(true);
 
-    const setter = SETTERS[tableKey];
+    // 1. Compute fresh records synchronously (before any state update)
+    //    so we know exactly what to send to the server.
+    const rawSetter = RAW_SETTERS[tableKey];
+    // Access current state via the SETTERS map (mkSet wraps the raw array)
+    // We need the current IDs — read them from the preview context instead
+    // by using a ref trick: capture inside a temporary state read.
+    // Simplest correct approach: filter by id collision in preview itself
+    // (uid() makes collisions essentially impossible, so all preview records are fresh).
+    const freshRecords = preview; // all imported rows are new (uid() ids)
 
-    // 1. Merge into local state (and localStorage via mkSet)
-    let freshRecords = [];
-    setter(prev => {
+    // 2. Merge into local state + localStorage WITHOUT going through mkSet.
+    //    mkSet would sync the entire table array which can be huge.
+    rawSetter(prev => {
       const existingIds = new Set((prev||[]).map(r => r.id));
-      freshRecords = preview.filter(r => !existingIds.has(r.id));
-      return [...(prev||[]), ...freshRecords];
+      const deduped = freshRecords.filter(r => !existingIds.has(r.id));
+      const merged = [...(prev||[]), ...deduped];
+      DB.save(tableKey, merged); // persist to localStorage
+      return merged;
     });
 
-    // 2. Push ONLY the new records to Supabase in batches of 100.
-    //    Sending the entire table would hit payload/timeout limits.
-    //    mkSet already called syncToServer with the full array, but we
-    //    override that by directly syncing just the fresh records here.
-    if (freshRecords.length > 0) {
-      const BATCH = 100;
-      for (let i = 0; i < freshRecords.length; i += BATCH) {
-        const batch = freshRecords.slice(i, i + BATCH);
-        try {
-          await syncToServer(tableKey, batch);
-        } catch (e) {
-          console.warn("[Bender] Import batch sync failed:", e.message);
-        }
+    // 3. Push ONLY the new records to Supabase in batches of 100.
+    //    syncToServer sends them via /api/sync which applies toSnake() server-side.
+    let syncOk = true;
+    const BATCH = 100;
+    for (let i = 0; i < freshRecords.length; i += BATCH) {
+      const batch = freshRecords.slice(i, i + BATCH);
+      try {
+        await syncToServer(tableKey, batch);
+      } catch (e) {
+        syncOk = false;
+        console.warn("[Bender] Import batch sync failed:", e.message);
       }
     }
 
     setLoading(false);
-    addNote(`✓ Imported ${preview.length} ${schema.label} record${preview.length !== 1 ? "s" : ""}${skipped.length ? ` (${skipped.length} skipped)` : ""}`, "success");
+    const status = syncOk ? "success" : "warning";
+    const msg = syncOk
+      ? `✓ Imported ${preview.length} ${schema.label} record${preview.length !== 1 ? "s" : ""}${skipped.length ? ` (${skipped.length} skipped)` : ""}`
+      : `⚠ Imported locally but server sync failed — will retry when online`;
+    addNote(msg, status);
     setStep("done");
   };
 
