@@ -250,7 +250,8 @@ app.post("/api/auth/refresh", async (req, res) => {
 app.get("/api/users", async (req, res) => {
   try {
     const rows = await sbFetch("/profiles?select=id,name,email,role,cws_access,machine_id,avatar,created_at,updated_at,active&order=name");
-    res.json(rows);
+    // Convert snake_case → camelCase so client gets cwsAccess, machineId etc.
+    res.json(Array.isArray(rows) ? rows.map(toCamel) : rows);
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
@@ -332,6 +333,28 @@ const TABLES = [
   "machines","assistants","tasks","mach_tx","driver_logs","leaves",
 ];
 
+// ── Case conversion helpers ───────────────────────────────────────────
+// toSnake: client camelCase → Supabase snake_case  (used in /api/sync)
+// toCamel: Supabase snake_case → client camelCase  (used in /api/pull, /api/users)
+function toSnake(obj) {
+  if (!obj || typeof obj !== "object" || Array.isArray(obj)) return obj;
+  const out = {};
+  for (const [k, v] of Object.entries(obj)) {
+    const snake = k.replace(/([A-Z])/g, m => "_" + m.toLowerCase());
+    out[snake] = v;
+  }
+  return out;
+}
+function toCamel(obj) {
+  if (!obj || typeof obj !== "object" || Array.isArray(obj)) return obj;
+  const out = {};
+  for (const [k, v] of Object.entries(obj)) {
+    const camel = k.replace(/_([a-z])/g, (_, c) => c.toUpperCase());
+    out[camel] = v;
+  }
+  return out;
+}
+
 TABLES.forEach(table => {
   const route = `/api/${table.replace(/_/g, "-")}`;
 
@@ -405,35 +428,63 @@ app.post("/api/sync", auth, async (req, res) => {
   for (const op of operations) {
     const { table, method, id, data } = op;
     if (!TABLES.includes(table)) {
-      results.push({ id, ok: false, error: "Unknown table" });
+      results.push({ id, ok: false, error: `Unknown table: ${table}` });
       continue;
     }
     try {
       if (method === "DELETE") {
         await sbFetch(`/${table}?id=eq.${id}`, { method: "DELETE" });
       } else {
+        // Convert camelCase → snake_case so fields like cwsId, createdAt,
+        // gnrNumber etc. match the actual Supabase column names.
+        const snakeData = toSnake({ ...data, updated_at: new Date().toISOString() });
         await sbFetch(`/${table}`, {
           method:  "POST",
           prefer:  "resolution=merge-duplicates,return=minimal",
-          body:    JSON.stringify({ ...data, updated_at: new Date().toISOString() }),
+          body:    JSON.stringify(snakeData),
         });
       }
       await logAudit(req.user.id, method, table, id, data);
       results.push({ id, ok: true });
     } catch (e) {
+      console.error(`[sync] ${method} ${table} ${id} failed:`, e.message || e);
       results.push({ id, ok: false, error: e.message || String(e) });
     }
   }
+
+  const failed = results.filter(r => !r.ok);
+  if (failed.length) console.warn(`[sync] ${failed.length} op(s) failed:`, failed);
   res.json({ ok: true, synced: results.filter(r => r.ok).length, results });
 });
 
 // ── Delta Pull ────────────────────────────────────────────────────────
+// Fetch all rows for a table past Supabase's 1000-row default limit
+// by paginating with Range headers until a page returns fewer than PAGE_SIZE rows.
+async function fetchAllRows(table, since) {
+  const PAGE_SIZE = 1000;
+  const sinceFilter = `updated_at=gte.${encodeURIComponent(since)}`;
+  const all = [];
+  let offset = 0;
+  while (true) {
+    const rows = await sbFetch(
+      `/${table}?${sinceFilter}&order=updated_at&limit=${PAGE_SIZE}&offset=${offset}`
+    );
+    if (!Array.isArray(rows) || rows.length === 0) break;
+    all.push(...rows);
+    if (rows.length < PAGE_SIZE) break; // last page
+    offset += PAGE_SIZE;
+  }
+  return all;
+}
+
 app.get("/api/pull", async (req, res) => {
   const since  = req.query.since || "1970-01-01T00:00:00.000Z";
   const delta  = {};
   await Promise.all(TABLES.map(async t => {
     try {
-      delta[t] = await sbFetch(`/${t}?updated_at=gte.${encodeURIComponent(since)}&order=updated_at`);
+      const rows = await fetchAllRows(t, since);
+      // Convert snake_case column names → camelCase for the client
+      delta[t] = rows.map(toCamel);
     } catch { delta[t] = []; }
   }));
   res.json({ since, pulledAt: new Date().toISOString(), delta });
